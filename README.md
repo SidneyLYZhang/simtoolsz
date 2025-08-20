@@ -1,7 +1,9 @@
 # simtoolsz
 
-[English](README_EN.md) | 中文
+<img alt="PyPI - License" src="https://img.shields.io/pypi/l/simtoolsz">
 
+
+[English](README_EN.md) | 中文
 
 一个简单、方便的工具集合，包含一些好用的函数、类、方法。
 
@@ -9,3 +11,8 @@
 现在做一些精简，保留最常用的哪些工具，以及一些常用的函数。
 
 
+## 安装
+
+```bash
+pip install simtoolsz
+```

@@ -1,4 +1,3 @@
-import re
 import imaplib
 import email
 import os
@@ -14,7 +13,7 @@ from email.utils import formataddr
 from email.header import Header
 from email.header import decode_header
 from datetime import datetime, timedelta
-from imapclient import imap_utf7
+
 
 
 def send_email(
@@ -604,8 +603,12 @@ def fetch_emails(
             "attachments_dir": None
         }
 
-# 保持向后兼容的别名
-def quick_send_email(*args, **kwargs):
+# 别名 - 与pytoolsz的相关函数兼容
+def quicksendemail(*args, **kwargs):
+    """兼容旧版本的send_email函数别名"""
+    return send_email(*args, **kwargs)
+
+def quickemail(*args, **kwargs):
     """兼容旧版本的send_email函数别名"""
     return send_email(*args, **kwargs)
 
