@@ -4,6 +4,7 @@ import os
 import smtplib
 import mimetypes
 from pathlib import Path
+from typing import Literal
 from typing import List, Dict, Union, Optional, Tuple, Any
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -14,11 +15,14 @@ from email.header import Header
 from email.header import decode_header
 from datetime import datetime, timedelta
 
+from simtoolsz.utils import take_from_list
+
+
 __all__ = [
     "send_email", "fetch_emails", 
-    "quicksendemail", "quickemail", "load_email_by_subject"
+    "quicksendemail", "quickemail", "load_email_by_subject",
+    "encode_utf7", "decode_utf7"
 ]
-
 
 def send_email(
     email_account: str,
@@ -292,6 +296,84 @@ def send_email(
             "smtp_server": smtp_server
         }
 
+def encode_utf7(text: str, type: Literal['imap','normal'] = 'imap') -> str :
+    """
+    将文本编码为UTF-7格式，主要用于IMAP协议中的邮箱名称编码。
+    
+    UTF-7编码是一种将Unicode文本编码为7位ASCII字符的编码方式，
+    特别适用于IMAP协议中的邮箱名称（folder name）编码，因为IMAP协议
+    要求邮箱名称必须是7位ASCII字符。
+    
+    使用示例:
+        # 编码中文邮箱名称
+        folder_name = "收件箱"
+        encoded = encode_utf7(folder_name)  # 返回IMAP格式的UTF-7编码
+        
+        # 使用标准UTF-7编码
+        standard_encoded = encode_utf7(folder_name, type='normal')
+        
+        # 编码包含特殊字符的邮箱名称
+        special_folder = "测试&文件夹"
+        encoded = encode_utf7(special_folder)
+
+    Args:
+        text: 需要编码的Unicode文本
+        type: 编码类型，可选值：
+            - 'imap': IMAP协议专用格式（默认），将'+'替换为'&'
+            - 'normal': 标准UTF-7格式
+
+    Returns:
+        str: UTF-7编码后的字符串
+        
+    注意:
+        - IMAP格式会将标准UTF-7中的'+'替换为'&'
+        - 纯ASCII字符不会被编码，保持原样
+        - 非ASCII字符会被编码为UTF-7格式
+    """
+    res = text.encode("utf-7").decode("utf-8")
+    if type == 'imap':
+        res = res.replace("+", "&")
+    return res
+
+def decode_utf7(text: str, type: Literal['imap','normal'] = 'imap') -> str:
+    """
+    将UTF-7编码的文本解码为Unicode格式，主要用于IMAP协议中的邮箱名称解码。
+    
+    这是encode_utf7的逆操作，用于将IMAP协议中的UTF-7编码邮箱名称
+    解码回原始的Unicode文本。
+    
+    使用示例:
+        # 解码IMAP格式的UTF-7编码
+        encoded_folder = "&UXZO1mWHTvZZOg-"  # "收件箱"的UTF-7编码
+        decoded = decode_utf7(encoded_folder)  # 返回"收件箱"
+        
+        # 解码标准UTF-7格式
+        standard_encoded = "+UXZO1mWHTvZZOg-"
+        decoded = decode_utf7(standard_encoded, type='normal')
+        
+        # 解码混合编码的邮箱路径
+        mixed_path = "INBOX/&UXZO1mWHTvZZOg-/测试"
+        parts = mixed_path.split('/')
+        decoded_parts = [decode_utf7(part) for part in parts]
+
+    Args:
+        text: UTF-7编码的字符串
+        type: 编码类型，可选值：
+            - 'imap': IMAP协议专用格式（默认），将'&'还原为'+'
+            - 'normal': 标准UTF-7格式
+
+    Returns:
+        str: 解码后的Unicode文本
+        
+    注意:
+        - IMAP格式会将'&'还原为标准的'+'再进行解码
+        - 纯ASCII字符保持不变
+        - 无效的UTF-7编码可能导致解码错误
+    """
+    if type == 'imap':
+        res = text.replace("&", "+")
+    return res.encode("utf-8").decode("utf-7")
+
 def fetch_emails(
     email_account: str,
     password: str,
@@ -421,7 +503,20 @@ def fetch_emails(
         
         try:
             mail.login(email_account, password)
-            
+
+            mailbox_list = mail.list()[1]
+            selected_mailbox = take_from_list(encode_utf7(mailbox), mailbox_list)
+            if selected_mailbox is None:
+                return {
+                    "success": False,
+                    "message": f"邮箱文件夹 {mailbox} 不存在",
+                    "email_count": 0,
+                    "emails": [],
+                    "attachments_dir": attachment_dir if download_attachments else None
+                }
+            else :
+                mailbox = selected_mailbox.decode().split('"')[-2]
+
             # 选择邮箱文件夹
             try:
                 mail.select(mailbox)
@@ -433,9 +528,10 @@ def fetch_emails(
             search_criteria = []
             
             # 日期范围
-            start_str = date_range[0].strftime("%d-%b-%Y")
-            end_str = date_range[1].strftime("%d-%b-%Y")
-            search_criteria.append(f'(SINCE "{start_str}" BEFORE "{end_str}")')
+            if date_range:
+                start_str = date_range[0].strftime("%d-%b-%Y")
+                end_str = date_range[1].strftime("%d-%b-%Y")
+                search_criteria.append(f'(SINCE "{start_str}" BEFORE "{end_str}")')
             
             # 主题搜索
             if subject:
