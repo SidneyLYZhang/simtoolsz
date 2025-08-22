@@ -1,7 +1,6 @@
 import imaplib
 import email
 import os
-from re import sub
 import smtplib
 import mimetypes
 from pathlib import Path
@@ -385,7 +384,8 @@ def fetch_emails(
     download_attachments: bool = False,
     attachment_dir: str = 'attachments',
     max_emails: Optional[int] = None,
-    imap_config: Optional[Dict[str, Any]] = None
+    imap_config: Optional[Dict[str, Any]] = None,
+    search_mode: Literal['exact','fuzzy','regex'] = 'exact'
 ) -> Dict[str, Any]:
     """
     简单易用的邮件获取函数（支持按主题、发件人搜索，附件下载等）
@@ -535,8 +535,8 @@ def fetch_emails(
             
             # 主题搜索
             if subject:
-                subject = encode_utf7(subject)
-                search_criteria.append(f'(SUBJECT "{subject}")')
+                subject7 = encode_utf7(subject)
+                search_criteria.append(f'(SUBJECT "{subject7}")')
             
             # 发件人搜索
             if sender:
@@ -591,6 +591,9 @@ def fetch_emails(
                             continue
                     elif subject and search_mode == 'fuzzy':
                         if subject.lower() not in subject_str.lower():
+                            continue
+                    elif subject and search_mode == 'exact':
+                        if subject != subject_str :
                             continue
                     
                     # 提取正文内容

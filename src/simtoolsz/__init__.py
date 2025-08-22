@@ -7,7 +7,7 @@ import simtoolsz.utils as utils
 try:
     __version__ = importlib.metadata.version("simtoolsz")
 except importlib.metadata.PackageNotFoundError:
-    __version__ = "0.1.5"
+    __version__ = "0.1.7"
 
 __all__ = [
     '__version__', 'mail', 'utils'
