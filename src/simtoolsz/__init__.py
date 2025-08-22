@@ -1,6 +1,7 @@
 import importlib.metadata
 
-import mail
+import simtoolsz.mail as mail
+
 
 try:
     __version__ = importlib.metadata.version("simtoolsz")
