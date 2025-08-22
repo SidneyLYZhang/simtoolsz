@@ -504,7 +504,7 @@ def fetch_emails(
         try:
             mail.login(email_account, password)
 
-            mailbox_list = mail.list()[1]
+            mailbox_list = [i.decode() for i in mail.list()[1]]
             selected_mailbox = take_from_list(encode_utf7(mailbox), mailbox_list)
             if selected_mailbox is None:
                 return {
@@ -515,7 +515,7 @@ def fetch_emails(
                     "attachments_dir": attachment_dir if download_attachments else None
                 }
             else :
-                mailbox = selected_mailbox.decode().split('"')[-2]
+                mailbox = selected_mailbox.split('"')[-2]
 
             # 选择邮箱文件夹
             try:
