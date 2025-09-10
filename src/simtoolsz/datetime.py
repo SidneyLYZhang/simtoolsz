@@ -353,6 +353,40 @@ class ConversionType(object) :
         else:
             return duration.total_seconds()
     
+    def _duration_to_iso(self, duration: plm.Duration) -> str:
+        """将Duration转换为ISO 8601格式"""
+        # 获取总秒数
+        total_seconds = duration.total_seconds()
+        
+        # 提取各个时间分量
+        days = duration.days
+        hours = int((total_seconds - days * 86400) // 3600)
+        minutes = int((total_seconds - days * 86400 - hours * 3600) // 60)
+        seconds = total_seconds - days * 86400 - hours * 3600 - minutes * 60
+        
+        # 构建 ISO8601 字符串
+        parts = []
+        
+        if days != 0:
+            parts.append(f"{days}D")
+        
+        if hours != 0 or minutes != 0 or seconds != 0:
+            time_part = f"{hours:02d}:{minutes:02d}"
+            if seconds != 0:
+                # 处理小数秒
+                if seconds.is_integer():
+                    time_part += f":{int(seconds):02d}"
+                else:
+                    time_part += f":{seconds:06.3f}".rstrip('0').rstrip('.')
+            parts.append(time_part)
+        
+        # 组合结果
+        if parts:
+            result = "P" + "T".join(parts)
+            return result
+        else:
+            return "PT0S"  # 零持续时间
+    
     def _duration_to_chinese(self, duration: plm.Duration) -> str:
         """将Duration转换为中文格式"""
         total_seconds = duration.total_seconds()
