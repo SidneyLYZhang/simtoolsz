@@ -6,7 +6,8 @@ import re
 
 
 __all__ = [
-    'TimeConversion', 'DurationFormat', 'DURATIONTYPE'
+    'TimeConversion', 'DurationFormat', 'DURATIONTYPE',
+    'covertChineseShort'
 ]
 
 DURATIONTYPE = NewType('DURATIONTYPE', str | Number | plm.Duration)
@@ -511,3 +512,15 @@ class TimeConversion(object) :
     
     def __str__(self) -> str:
         return f"TimeConversion({self._time}, format={self._Type})"
+
+
+def covertChineseShort(time:DURATIONTYPE) -> str :
+    """
+    将时间转换为中文短格式，即最小时间单位为秒
+    """
+    tc = TimeConversion(time)
+    middle = round(tc.convert("seconds"))
+    tc = TimeConversion(middle, "seconds")
+    res = tc.convert("chinese")
+    res = res.replace("钟", "")
+    return res
