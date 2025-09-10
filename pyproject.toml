@@ -1,13 +1,15 @@
 [project]
 name = "simtoolsz"
-version = "0.1.7"
+version = "0.1.10"
 description = "A simple tool collection."
 keywords = ["tool", "collection"]
 license = { text = "MulanPSL-2.0" }
 authors = [
     { name = "Sidney Zhang", email = "liangyi@me.com" }
 ]
-dependencies = []
+dependencies = [
+    "pendulum>=3.1.0",
+]
 readme = "README.md"
 requires-python = ">= 3.11"
 

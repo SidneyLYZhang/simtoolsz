@@ -1,11 +1,13 @@
-from typing import List, Optional, TypeVar, Any
+from typing import List, NewType, Optional, TypeVar, Any
 from collections.abc import Iterable
 
 T = TypeVar('T')
 
 __all__ = [
-    'take_from_list'
+    'take_from_list', 'Number'
 ]
+
+Number = NewType('Number', int | float | complex)
 
 
 def take_from_list(target: T, source: List[T]) -> Optional[T]:
