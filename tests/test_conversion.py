@@ -72,7 +72,7 @@ def test_time_conversion():
     assert abs(result - 90.0) < 0.001
     
     # 测试格式转换
-    tc = TimeConversion(7200)  # 默认seconds
+    tc = TimeConversion(2)  # 默认seconds
     print(f"  当前格式: {tc.get_format()}")
     tc.set_format("hours")
     result = tc.convert("seconds")

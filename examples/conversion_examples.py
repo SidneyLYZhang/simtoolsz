@@ -71,6 +71,38 @@ def main():
     tc2 = TimeConversion(2, "hours")
     result = tc2.convert("seconds")
     print(f"   2小时 = {result}秒")
+    
+    # 示例9: ISO 8601 格式转换
+    print("\n9. ISO 8601 格式转换")
+    
+    # 秒到ISO 8601
+    tc = TimeConversion(90061, "seconds")
+    iso_format = tc.convert("iso8601")
+    print(f"   90061秒 = {iso_format}")
+    
+    # ISO 8601到秒
+    tc = TimeConversion("P1DT1H1M1S", "iso8601")
+    seconds = tc.convert("seconds")
+    print(f"   P1DT1H1M1S = {seconds}秒")
+    
+    # 复杂ISO 8601格式
+    tc = TimeConversion("PT2H30M15.5S", "iso8601")
+    print(f"   PT2H30M15.5S = {tc.convert('minutes')}分钟")
+    
+    # 示例10: 所有格式间的相互转换
+    print("\n10. 所有格式间的相互转换")
+    original = 3661.5  # 1小时1分钟1.5秒
+    tc = TimeConversion(original, "seconds")
+    
+    print(f"   原始: {original}秒")
+    print(f"   中文: {tc.convert('chinese')}")
+    print(f"   英文: {tc.convert('english')}")
+    print(f"   冒号: {tc.convert('colon')}")
+    print(f"   ISO 8601: {tc.convert('iso8601')}")
+    print(f"   毫秒: {tc.convert('milliseconds')}")
+    print(f"   分钟: {tc.convert('minutes')}")
+    print(f"   小时: {tc.convert('hours')}")
+    print(f"   天: {tc.convert('hours') / 24}")
 
 if __name__ == "__main__":
     main()

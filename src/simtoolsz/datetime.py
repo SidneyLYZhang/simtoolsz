@@ -205,10 +205,7 @@ class ConversionType(object) :
             
             # 处理ISO8601格式
             if self._type == DurationFormat.ISO8601:
-                try:
-                    return plm.duration(value)
-                except Exception as e:
-                    raise ValueError(f"无效的ISO8601格式: {value} - {e}")
+                return self._parse_iso8601_duration(value)
             
             # 处理中文格式
             if self._type == DurationFormat.CHINESE:
@@ -330,6 +327,60 @@ class ConversionType(object) :
         else:
             raise ValueError(f"无效的冒号时间格式: {value}")
     
+    def _parse_iso8601_duration(self, value: str) -> plm.Duration:
+        """解析ISO 8601持续时间格式"""
+        import re
+        
+        value = value.strip()
+        if not value.startswith('P'):
+            raise ValueError(f"无效的ISO 8601格式: {value} (必须以P开头)")
+        
+        # 移除P前缀
+        duration_str = value[1:]
+        
+        total_seconds = 0
+        
+        # 分离日期和时间部分
+        if 'T' in duration_str:
+            date_part, time_part = duration_str.split('T', 1)
+        else:
+            date_part = duration_str
+            time_part = ''
+        
+        # 解析日期部分
+        if date_part:
+            # 匹配天
+            day_match = re.search(r'(\d+(?:\.\d+)?)D', date_part)
+            if day_match:
+                total_seconds += float(day_match.group(1)) * 86400
+            
+            # 匹配周
+            week_match = re.search(r'(\d+(?:\.\d+)?)W', date_part)
+            if week_match:
+                total_seconds += float(week_match.group(1)) * 7 * 86400
+        
+        # 解析时间部分
+        if time_part:
+            # 匹配小时
+            hour_match = re.search(r'(\d+(?:\.\d+)?)H', time_part)
+            if hour_match:
+                total_seconds += float(hour_match.group(1)) * 3600
+            
+            # 匹配分钟
+            minute_match = re.search(r'(\d+(?:\.\d+)?)M', time_part)
+            if minute_match:
+                total_seconds += float(minute_match.group(1)) * 60
+            
+            # 匹配秒
+            second_match = re.search(r'(\d+(?:\.\d+)?)S', time_part)
+            if second_match:
+                total_seconds += float(second_match.group(1))
+        
+        if total_seconds == 0 and value != 'PT0S':
+            raise ValueError(f"无效的ISO 8601格式: {value} (没有有效的时间单位)")
+        
+        return plm.duration(seconds=total_seconds)
+    
     def _duration_to_target(self, duration: plm.Duration, target_format: DurationFormat) -> DURATIONTYPE:
         """将Duration转换为目标格式"""
         if target_format == DurationFormat.SECONDS:
@@ -341,7 +392,7 @@ class ConversionType(object) :
         elif target_format == DurationFormat.HOURS:
             return duration.total_seconds() / 3600
         elif target_format == DurationFormat.ISO8601:
-            return duration.iso_string()
+            return self._duration_to_iso(duration)
         elif target_format == DurationFormat.CHINESE:
             return self._duration_to_chinese(duration)
         elif target_format == DurationFormat.ENGLISH:
@@ -355,37 +406,59 @@ class ConversionType(object) :
     
     def _duration_to_iso(self, duration: plm.Duration) -> str:
         """将Duration转换为ISO 8601格式"""
-        # 获取总秒数
         total_seconds = duration.total_seconds()
         
-        # 提取各个时间分量
-        days = duration.days
-        hours = int((total_seconds - days * 86400) // 3600)
-        minutes = int((total_seconds - days * 86400 - hours * 3600) // 60)
-        seconds = total_seconds - days * 86400 - hours * 3600 - minutes * 60
+        # 如果为零持续时间
+        if total_seconds == 0:
+            return "PT0S"
         
-        # 构建 ISO8601 字符串
+        # 获取Duration的各个分量
+        days = duration.days
+        
+        # 计算剩余的时间分量
+        remaining_seconds = total_seconds - (days * 86400)
+        hours = int(remaining_seconds // 3600)
+        remaining_seconds %= 3600
+        minutes = int(remaining_seconds // 60)
+        seconds = remaining_seconds % 60
+        
+        # 构建ISO 8601格式的各个部分
         parts = []
         
+        # 处理天数
         if days != 0:
             parts.append(f"{days}D")
         
-        if hours != 0 or minutes != 0 or seconds != 0:
-            time_part = f"{hours:02d}:{minutes:02d}"
-            if seconds != 0:
-                # 处理小数秒
-                if seconds.is_integer():
-                    time_part += f":{int(seconds):02d}"
-                else:
-                    time_part += f":{seconds:06.3f}".rstrip('0').rstrip('.')
-            parts.append(time_part)
+        # 处理时间部分
+        time_parts = []
+        if hours != 0:
+            time_parts.append(f"{hours}H")
+        if minutes != 0:
+            time_parts.append(f"{minutes}M")
+        if seconds != 0:
+            # 处理小数秒
+            if seconds.is_integer():
+                if int(seconds) != 0:
+                    time_parts.append(f"{int(seconds)}S")
+            else:
+                # 移除末尾的零和小数点
+                seconds_str = f"{seconds:.6f}".rstrip('0').rstrip('.')
+                time_parts.append(f"{seconds_str}S")
         
         # 组合结果
-        if parts:
-            result = "P" + "T".join(parts)
-            return result
-        else:
-            return "PT0S"  # 零持续时间
+        result = "P"
+        
+        if parts and time_parts:
+            # 既有日期部分又有时间部分
+            result += "".join(parts) + "T" + "".join(time_parts)
+        elif parts:
+            # 只有日期部分
+            result += "".join(parts)
+        elif time_parts:
+            # 只有时间部分
+            result += "T" + "".join(time_parts)
+        
+        return result
     
     def _duration_to_chinese(self, duration: plm.Duration) -> str:
         """将Duration转换为中文格式"""
