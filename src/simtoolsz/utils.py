@@ -1,16 +1,22 @@
 from typing import List, NewType, Optional, TypeVar, Union
 from collections.abc import Iterable
 from datetime import datetime as dt
+from pathlib import Path
 
 import pendulum as plm
 
 T = TypeVar('T')
 
 __all__ = [
-    'take_from_list', 'Number', 'today'
+    'take_from_list', 'Number', 'today', 'PathLike', 'FolderPaths', 'CheckResult'
 ]
 
 Number = NewType('Number', int | float | complex)
+
+# 类型别名定义
+PathLike = Union[str, Path]
+FolderPaths = Union[PathLike, list[PathLike]]
+CheckResult = Union[bool, list[bool], None]
 
 def take_from_list(target: T, source: List[T]) -> Optional[T]:
     """
@@ -130,3 +136,35 @@ def today(tz: Optional[str] = None,
     
     # 返回 pendulum DateTime 对象
     return res
+
+def checkFolders(folders: FolderPaths, 
+                 mkdir: bool = True, output: bool = False) -> CheckResult:
+    """
+    检查多个文件夹路径是否存在
+    
+    Args:
+        folders: 文件夹路径 (str/Path) 或路径列表
+        mkdir: 是否创建不存在的文件夹（默认创建）
+        output: 是否返回检查结果（默认不输出）
+    
+    Returns:
+        CheckResult: 当output为True时返回检查结果，为False时返回None
+        - 单个路径: bool
+        - 多个路径: list[bool]
+    """
+    # 统一转换为列表
+    folder_list = [folders] if isinstance(folders, (str, Path)) else folders
+    paths = [Path(folder) for folder in folder_list]
+    
+    # 检查存在性
+    exists_flags = [path.exists() for path in paths]
+    
+    # 创建不存在的文件夹
+    if mkdir:
+        for path, exists in zip(paths, exists_flags):
+            if not exists and path != Path("No Path"):
+                path.mkdir(parents=True, exist_ok=True)
+    
+    # 返回结果
+    if output:
+        return exists_flags[0] if len(exists_flags) == 1 else exists_flags

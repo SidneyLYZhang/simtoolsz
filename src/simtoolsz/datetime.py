@@ -1,16 +1,19 @@
 import pendulum as plm
 from enum import Enum
-from simtoolsz.utils import Number
+from simtoolsz.utils import Number,today
 from typing import NewType, Self, Optional, Callable
 import re
+import datetime as dt
 
 
 __all__ = [
     'TimeConversion', 'DurationFormat', 'DURATIONTYPE',
-    'covertChineseShort'
+    'covertChineseShort', 'getTimeSpan'
 ]
 
 DURATIONTYPE = NewType('DURATIONTYPE', str | Number | plm.Duration)
+
+DATETIMESETS = NewType('DATETIMESETS', plm.DateTime | dt.datetime)
 
 class DurationFormat(Enum):
     """时间持续格式枚举类，提供各种时间格式化的标准格式"""
@@ -631,3 +634,117 @@ def covertChineseShort(time:DURATIONTYPE) -> str :
     res = tc.convert("chinese")
     res = res.replace("钟", "")
     return res
+
+def getTimeSpan(baseDate: DATETIMESETS | str | None, 
+                interval: str = "4 days",
+                direction: str = "forward",
+                youtube: bool = False,
+                fmt: str | None = None) -> tuple:
+    """
+    基于基准时间获取一个时间间隔
+    
+    Args:
+        baseDate: 基准时间，可以是None(使用今天)、字符串或datetime对象
+        interval: 时间间隔字符串，格式如"4 days", "1 month", "2 years"
+        direction: 时间计算方向，'forward'或'backward'，默认'forward'
+                  - 'forward': 基准时间作为开始时间，向前计算间隔得到结束时间
+                  - 'backward': 基准时间作为结束时间，向后计算间隔得到开始时间
+        youtube: 是否为youtube模式，为true时结束日期增加一天
+        fmt: 日期格式字符串，如果有值则返回格式化后的字符串
+        
+    Returns:
+        tuple: (开始日期, 结束日期) 或格式化后的字符串元组，始终按时间顺序返回
+        
+    Examples:
+        >>> getTimeSpan("2025-01-01", "4 days")
+        (DateTime(2025, 1, 1, 0, 0, 0, tzinfo=Timezone('Asia/Shanghai')), DateTime(2025, 1, 5, 0, 0, 0, tzinfo=Timezone('Asia/Shanghai')))
+        >>> getTimeSpan("2025-01-01", "4 days", direction="backward")
+        (DateTime(2024, 12, 28, 0, 0, 0, tzinfo=Timezone('Asia/Shanghai')), DateTime(2025, 1, 1, 0, 0, 0, tzinfo=Timezone('Asia/Shanghai')))
+        >>> getTimeSpan("2025-01-01", "4 days", youtube=True)
+        (DateTime(2025, 1, 1, 0, 0, 0, tzinfo=Timezone('Asia/Shanghai')), DateTime(2025, 1, 6, 0, 0, 0, tzinfo=Timezone('Asia/Shanghai')))
+        >>> getTimeSpan("2025-01-01", "4 days", fmt="YYYY-MM-DD")
+        ('2025-01-01', '2025-01-05')
+    """
+    # 参数验证
+    if not isinstance(interval, str) or not interval.strip():
+        raise ValueError("时间间隔不能为空")
+    
+    if direction not in ["forward", "backward"]:
+        raise ValueError(f"不支持的时间方向: {direction}，应该是'forward'或'backward'")
+    
+    # 处理基准时间
+    if baseDate is None:
+        baseDate = today()
+    elif isinstance(baseDate, str):
+        try:
+            baseDate = plm.parse(baseDate)
+        except Exception as e:
+            raise ValueError(f"无效的日期字符串: {baseDate} - {e}")
+    else:
+        try:
+            baseDate = plm.instance(baseDate)
+        except Exception as e:
+            raise ValueError(f"无效的日期对象: {baseDate} - {e}")
+    
+    # 解析时间间隔
+    parts = interval.strip().split()
+    if len(parts) != 2:
+        raise ValueError(f"无效的时间间隔格式: {interval}，应该是'数字 单位'格式")
+    
+    value_str, unit = parts
+    
+    # 验证数值
+    try:
+        value = int(value_str)
+        if value < 0:
+            raise ValueError("时间间隔不能为负数")
+    except ValueError as e:
+        if "负数" in str(e):
+            raise
+        raise ValueError(f"无效的时间间隔数值: {value_str}，应该是整数")
+    
+    # 单位映射和验证
+    unit_mappings = {
+        'day': 'days', 'days': 'days',
+        'week': 'weeks', 'weeks': 'weeks', 
+        'month': 'months', 'months': 'months',
+        'year': 'years', 'years': 'years',
+        'hour': 'hours', 'hours': 'hours',
+        'minute': 'minutes', 'minutes': 'minutes',
+        'second': 'seconds', 'seconds': 'seconds'
+    }
+    
+    unit = unit.lower()
+    if unit not in unit_mappings:
+        raise ValueError(f"不支持的时间单位: {unit}，支持的单位: {list(unit_mappings.keys())}")
+    
+    pendulum_unit = unit_mappings[unit]
+    time_kwargs = {pendulum_unit: value}
+    
+    # 根据方向计算时间范围
+    if direction == "forward":
+        start_date = baseDate
+        end_date = baseDate.add(**time_kwargs)
+    else:  # backward
+        start_date = baseDate.subtract(**time_kwargs)
+        end_date = baseDate
+    
+    # Youtube模式：结束日期增加一天
+    if youtube:
+        end_date = end_date.add(days=1)
+    
+    # 确保开始日期早于结束日期（处理边界情况）
+    if start_date > end_date:
+        start_date, end_date = end_date, start_date
+    
+    # 格式化输出
+    if fmt:
+        try:
+            start_str = start_date.format(fmt)
+            end_str = end_date.format(fmt)
+            return (start_str, end_str)
+        except Exception as e:
+            raise ValueError(f"无效的格式字符串: {fmt} - {e}")
+    
+    return (start_date, end_date)
+    
