@@ -2,13 +2,15 @@ from typing import List, NewType, Optional, TypeVar, Union
 from collections.abc import Iterable
 from datetime import datetime as dt
 from pathlib import Path
+import sys
 
 import pendulum as plm
 
 T = TypeVar('T')
 
 __all__ = [
-    'take_from_list', 'Number', 'today', 'PathLike', 'FolderPaths', 'CheckResult'
+    'take_from_list', 'Number', 'today', 'PathLike', 'FolderPaths', 'CheckResult',
+    'checkFolders', 'lastFile'
 ]
 
 Number = NewType('Number', int | float | complex)
@@ -168,3 +170,54 @@ def checkFolders(folders: FolderPaths,
     # 返回结果
     if output:
         return exists_flags[0] if len(exists_flags) == 1 else exists_flags
+
+def lastFile(folder: str | Path, filename: str,
+             last_: str = "mtime", mode: str = "desc") -> Path:
+    """
+    获取指定文件夹下的最后一个文件
+    
+    Args:
+        folder: 目标文件夹路径
+        filename: 文件名或匹配模式（支持通配符）
+        last_: 排序依据，可选值：
+            - "mtime": 修改时间（默认）
+            - "createtime": 创建时间
+            - "atime": 访问时间  
+            - "size": 文件大小
+        mode: 排序方式，可选值：
+            - "desc": 降序（默认）
+            - "asc": 升序
+    
+    Returns:
+        Path: 匹配条件的文件路径，若无匹配则返回 Path("No Path")
+    """
+    # 参数验证
+    if mode not in ["desc", "asc"]:
+        raise ValueError(f"mode must be one of {['desc', 'asc']}")
+    
+    # 获取文件属性名映射
+    attr_map = {
+        "createtime": "birthtime" if sys.version_info >= (3, 12) else "ctime",
+        "mtime": "mtime",
+        "atime": "atime", 
+        "size": "size"
+    }
+    
+    if last_ not in attr_map:
+        raise ValueError(f"last_ must be one of {list(attr_map.keys())}")
+    
+    # 搜索文件
+    folder_path = Path(folder)
+    matched_files = list(folder_path.glob(filename))
+    
+    if not matched_files:
+        return Path("No Path")
+    
+    # 获取排序属性值
+    attr_name = f"st_{attr_map[last_]}"
+    
+    # 使用内置排序，避免创建中间列表
+    reverse = mode == "desc"
+    key_func = lambda f: getattr(f.stat(), attr_name)
+    
+    return sorted(matched_files, key=key_func, reverse=reverse)[0]
