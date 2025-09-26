@@ -137,8 +137,11 @@ def send_email(
     
     # 设置发件人
     if sender_name:
-        sender_name = Header(sender_name, "utf-8").encode()
-    msg["From"] = formataddr((sender_name, email_account)) if sender_name else email_account
+        # 使用Header处理非ASCII字符，然后手动格式化地址
+        encoded_name = Header(sender_name, "utf-8").encode()
+        msg["From"] = f"{encoded_name} <{email_account}>"
+    else:
+        msg["From"] = email_account
     
     def format_recipient_list(recipient_list):
         """格式化收件人列表"""
@@ -146,8 +149,12 @@ def send_email(
         for recipient in recipient_list:
             if isinstance(recipient, tuple) and len(recipient) == 2:
                 name, addr = recipient
-                name = Header(name, "utf-8").encode()
-                formatted.append(formataddr((name, addr)))
+                if name:
+                    # 使用Header处理非ASCII字符，然后手动格式化地址
+                    encoded_name = Header(name, "utf-8").encode()
+                    formatted.append(f"{encoded_name} <{addr}>")
+                else:
+                    formatted.append(addr)
             else:
                 # 处理字符串格式如 "张三<user@example.com>"
                 recipient_str = str(recipient)
@@ -155,8 +162,9 @@ def send_email(
                     name_part = recipient_str.split("<")[0].strip()
                     addr_part = recipient_str.split("<")[1].split(">")[0].strip()
                     if name_part:
-                        name_part = Header(name_part, "utf-8").encode()
-                        formatted.append(formataddr((name_part, addr_part)))
+                        # 使用Header处理非ASCII字符，然后手动格式化地址
+                        encoded_name = Header(name_part, "utf-8").encode()
+                        formatted.append(f"{encoded_name} <{addr_part}>")
                     else:
                         formatted.append(addr_part)
                 else:
@@ -165,9 +173,15 @@ def send_email(
     
     # 设置收件人
     msg["Subject"] = Header(subject, "utf-8")
-    msg["To"] = ", ".join(format_recipient_list(all_recipients))
+    
+    # 处理收件人，确保正确编码
+    if all_recipients:
+        formatted_recipients = format_recipient_list(all_recipients)
+        msg["To"] = ", ".join(formatted_recipients)
+    
     if all_cc:
-        msg["Cc"] = ", ".join(format_recipient_list(all_cc))
+        formatted_cc = format_recipient_list(all_cc)
+        msg["Cc"] = ", ".join(formatted_cc)
     
     # 处理邮件正文和签名
     full_content = content
@@ -202,8 +216,9 @@ def send_email(
                 _, subtype = mime_type.split("/", 1)
                 img_part = MIMEImage(img_data, _subtype=subtype)
                 img_part.add_header("Content-ID", f"<{cid}>")
-                img_part.add_header("Content-Disposition", "inline", 
-                                  filename=Header(img_path.name, "utf-8").encode())
+                # 正确处理内嵌图片文件名编码
+                encoded_filename = Header(img_path.name, "utf-8").encode()
+                img_part.add_header("Content-Disposition", "inline", filename=encoded_filename)
                 msg.attach(img_part)
             except Exception as e:
                 raise RuntimeError(f"处理内嵌图片失败 {img_path}: {e}")
@@ -218,9 +233,10 @@ def send_email(
             with open(file_path, "rb") as f:
                 file_data = f.read()
             
-            part = MIMEApplication(file_data, Name=Header(file_path.name, "utf-8").encode())
-            part.add_header("Content-Disposition", "attachment", 
-                          filename=Header(file_path.name, "utf-8").encode())
+            # 正确处理附件文件名编码
+            encoded_filename = Header(file_path.name, "utf-8").encode()
+            part = MIMEApplication(file_data, Name=encoded_filename)
+            part.add_header("Content-Disposition", "attachment", filename=encoded_filename)
             msg.attach(part)
         except Exception as e:
             raise RuntimeError(f"处理附件失败 {file_path}: {e}")
