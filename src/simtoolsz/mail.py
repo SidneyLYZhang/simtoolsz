@@ -293,6 +293,7 @@ def send_email(
             server.starttls()
         
         # 登录并发送
+        server.local_hostname = 'Localhost'
         server.login(email_account, password)
         server.sendmail(email_account, all_emails, msg.as_string())
         server.quit()

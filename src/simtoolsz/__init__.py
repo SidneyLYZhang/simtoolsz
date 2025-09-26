@@ -9,7 +9,7 @@ import simtoolsz.datetime as datetime
 try:
     __version__ = importlib.metadata.version("simtoolsz")
 except importlib.metadata.PackageNotFoundError:
-    __version__ = "0.2.1"
+    __version__ = "0.2.2"
 
 __all__ = [
     '__version__', 'mail', 'utils', 'datetime', 'io'
