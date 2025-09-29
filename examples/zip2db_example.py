@@ -8,7 +8,7 @@ import zipfile
 import tempfile
 import json
 from pathlib import Path
-from simtoolsz.io import zip2db
+from simtoolsz.db import zip2db
 
 def create_sample_data(tmpdir):
     """创建示例数据"""

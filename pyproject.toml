@@ -1,6 +1,6 @@
 [project]
 name = "simtoolsz"
-version = "0.2.2"
+version = "0.2.5"
 description = "A simple tool collection."
 keywords = ["tool", "collection"]
 license = { text = "MulanPSL-2.0" }
