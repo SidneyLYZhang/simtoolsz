@@ -1,7 +1,11 @@
+from tkinter import N
 import warnings
 import polars as pl
 from pathlib import Path
 from typing import Optional, Callable
+from zipfile import ZipFile, is_zipfile
+from tarfile import TarFile, is_tarfile
+
 
 __all__ = [
     "read_tsv", "scan_tsv", "getreader", "load_data"
@@ -211,6 +215,98 @@ def getreader(
         stacklevel=2
     )
     return _get_fallback_reader(lazy)
+
+
+def _is_archive_file(file_path: Path) -> bool:
+    """
+    Check if the file is an archive file.
+    
+    Args:
+        file_path: Path to the file
+        
+    Returns:
+        bool: True if the file is an archive file(zip or tar), False otherwise
+    """
+    if not file_path.is_file():
+        return False
+    return is_zipfile(file_path) or is_tarfile(file_path)
+
+def _get_archive_filename(file_path: Path) -> str:
+    """
+    Get the filename inside the archive file.
+    
+    Args:
+        file_path: Path to the file
+        
+    Returns:
+        str: Filename inside the archive file
+    """
+    if not _is_archive_file(file_path):
+        raise ValueError("file_path must be an archive file(zip or tar)")
+    if is_zipfile(file_path):
+        with ZipFile(file_path) as zf:
+            return zf.namelist()[0]
+    elif is_tarfile(file_path):
+        with TarFile(file_path) as tf:
+            return tf.getnames()[0]
+
+
+def read_zip(file_path: str | Path,
+             filename: Optional[str] = None,
+             format_type: Optional[str] = None,
+             **kwargs
+) -> pl.DataFrame :
+    """
+    Read data file inside a zip file or a tar file.
+    
+    The Path like : `path/to/compressed.zip/data.csv` or `path/to/compressed.tar.gz`
+
+    Args:
+        file_path: Path to data file inside the zip file or tar file
+        filename: Optional filename to read from the zip file, if None, read the first file in the zip file
+        format_type: Optional format override (e.g., 'csv', 'json', 'parquet')
+        **kwargs: Additional arguments to pass to the reader function
+        
+    Returns:
+        pl.DataFrame: Loaded data
+    """
+    # Step 1 : data path validation
+    file_path = Path(file_path)
+    if filename is None:
+        archive_path = file_path.parent
+        if _is_archive_file(archive_path):
+            filename = file_path.name
+        elif _is_archive_file(file_path):
+            filename = _get_archive_filename(file_path)
+        elif any(_is_archive_file(i) for i in file_path.parents):
+            filename = file_path.name
+            for i in file_path.parents:
+                if _is_archive_file(i):
+                    archive_path = i
+        else:
+            raise ValueError("file_path must be a file inside an archive file(zip or tar)")
+    
+    # Step 2 : get reader function
+    focus = True if format_type is not None else False
+    reader = getreader(filename, format_type=format_type, focus=focus)
+    
+    # Step 3 : read compressed data file
+    if is_zipfile(archive_path):
+        with zipfile.ZipFile(archive_path, 'r') as zf:
+            if filename is None:
+                filename = zf.namelist()[0]
+            with zf.open(filename) as f:
+                df = _get_reader_mapping(lazy)[fmt](f, **kwargs)
+    elif is_tarfile(archive_path):
+        with tarfile.TarFile(archive_path, 'r') as tf:
+            if filename is None:
+                filename = tf.getnames()[0]
+            with tf.extractfile(filename) as f:
+                df = _get_reader_mapping(lazy)[fmt](f, **kwargs)
+    
+    return df
+
+
 
 def load_data(
     file_path: Path | str,

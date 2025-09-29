@@ -1,7 +1,7 @@
 [project]
 name = "simtoolsz"
-version = "0.2.5"
-description = "A simple tool collection."
+version = "0.2.6"
+description = "A simple and convenient toolkit containing useful functions, classes, and methods."
 keywords = ["tool", "collection"]
 license = { text = "MulanPSL-2.0" }
 authors = [
@@ -14,6 +14,21 @@ dependencies = [
 ]
 readme = "README.md"
 requires-python = ">= 3.11"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "License :: OSI Approved :: Mulan Permissive Software License v2 (MulanPSL-2.0)",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/SidneyLYZhang/simtoolsz"
+Repository = "https://github.com/SidneyLYZhang/simtoolsz.git"
+Issues = "https://github.com/SidneyLYZhang/simtoolsz/issues"
 
 [build-system]
 requires = ["hatchling==1.26.3", "hatch-vcs"]

@@ -1,8 +1,10 @@
 # simtoolsz
 
+<div>
 <img alt="PyPI - License" src="https://img.shields.io/pypi/l/simtoolsz">
 <img alt="PyPI - Version" src="https://img.shields.io/pypi/v/simtoolsz">
 <img alt="Python - Version" src="https://img.shields.io/pypi/pyversions/simtoolsz">
+</div>
 
 [English](README_EN.md) | 中文
 
@@ -46,7 +48,7 @@
 pip install simtoolsz
 ```
 
-### 同步添加以下核心依赖
+### 核心依赖
 
 - Python >= 3.11
 - pendulum >= 3.1.0
