@@ -102,17 +102,18 @@ result = send_email(
 from simtoolsz.reader import getreader
 import polars as pl
 
-# Read CSV file
+# Read CSV file using getreader
 reader = getreader("data.csv")
-df = reader()
+df = reader("data.csv")
 
 # Read TSV file
-reader = getreader("data.tsv")
-df = reader()
+df = load_tsv("data.tsv")
 
 # Lazy loading for large datasets
-reader = getreader("large_data.csv", lazy=True)
-lazy_df = reader()
+lazy_df = load_data("large_data.csv", lazy=True)
+
+# Load compressed dataset
+df = load_data("large_data_archive.tar.gz/data.csv")
 ```
 
 ### Compressed Data Import to Database

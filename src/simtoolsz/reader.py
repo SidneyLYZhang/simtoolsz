@@ -1,4 +1,3 @@
-from tkinter import N
 import warnings
 import polars as pl
 from pathlib import Path
@@ -6,9 +5,12 @@ from typing import Optional, Callable
 from zipfile import ZipFile, is_zipfile
 from tarfile import TarFile, is_tarfile
 
+from tempfile import TemporaryDirectory
+
 
 __all__ = [
-    "read_tsv", "scan_tsv", "getreader", "load_data"
+    "read_tsv", "scan_tsv", "getreader", "load_data", "read_archive",
+    "is_archive_file"
 ]
 
 def read_tsv(filepath: Path, lazy: bool = False, **kwargs
@@ -231,30 +233,28 @@ def _is_archive_file(file_path: Path) -> bool:
         return False
     return is_zipfile(file_path) or is_tarfile(file_path)
 
-def _get_archive_filename(file_path: Path) -> str:
+
+def is_archive_file(file_path: Path) -> bool:
     """
-    Get the filename inside the archive file.
+    Check if the file is an archive file or the file is in an archive file.
     
     Args:
         file_path: Path to the file
         
     Returns:
-        str: Filename inside the archive file
+        bool: True if the file is an archive file(zip or tar), False otherwise
     """
-    if not _is_archive_file(file_path):
-        raise ValueError("file_path must be an archive file(zip or tar)")
-    if is_zipfile(file_path):
-        with ZipFile(file_path) as zf:
-            return zf.namelist()[0]
-    elif is_tarfile(file_path):
-        with TarFile(file_path) as tf:
-            return tf.getnames()[0]
+    if not file_path.is_file():
+        return False
+    return _is_archive_file(file_path) or any(
+        _is_archive_file(p) for p in file_path.parents
+    )
 
 
-def read_zip(file_path: str | Path,
-             filename: Optional[str] = None,
-             format_type: Optional[str] = None,
-             **kwargs
+def read_archive(file_path: str | Path,
+                 filename: Optional[str] = None,
+                 format_type: Optional[str] = None,
+                 **kwargs
 ) -> pl.DataFrame :
     """
     Read data file inside a zip file or a tar file.
@@ -270,41 +270,170 @@ def read_zip(file_path: str | Path,
     Returns:
         pl.DataFrame: Loaded data
     """
-    # Step 1 : data path validation
     file_path = Path(file_path)
-    if filename is None:
+    
+    # Step 1: Determine archive path and filename
+    archive_path, target_filename = _resolve_archive_and_filename(file_path, filename)
+    
+    # Step 2: Get appropriate reader function
+    focus = format_type is not None
+    reader = getreader(target_filename, format_type=format_type, focus=focus)
+    
+    # Step 3: Read data from archive
+    return _read_from_archive(archive_path, target_filename, reader, **kwargs)
+
+
+def _resolve_archive_and_filename(file_path: Path, filename: Optional[str]) -> tuple[Path, str]:
+    """
+    Resolve archive path and target filename from the given file path.
+    
+    Args:
+        file_path: Path to data file inside archive
+        filename: Optional filename override
+        
+    Returns:
+        tuple: (archive_path, target_filename)
+        
+    Raises:
+        ValueError: If file_path is not inside an archive file
+    """
+    if filename is not None:
+        # If filename is provided, archive_path is the parent directory
         archive_path = file_path.parent
-        if _is_archive_file(archive_path):
-            filename = file_path.name
-        elif _is_archive_file(file_path):
-            filename = _get_archive_filename(file_path)
-        elif any(_is_archive_file(i) for i in file_path.parents):
-            filename = file_path.name
-            for i in file_path.parents:
-                if _is_archive_file(i):
-                    archive_path = i
-        else:
-            raise ValueError("file_path must be a file inside an archive file(zip or tar)")
+        if not _is_archive_file(archive_path):
+            raise ValueError(f"Parent directory is not an archive file: {archive_path}")
+        return archive_path, filename
     
-    # Step 2 : get reader function
-    focus = True if format_type is not None else False
-    reader = getreader(filename, format_type=format_type, focus=focus)
+    # Case 1: Parent directory is an archive
+    if _is_archive_file(file_path.parent):
+        return file_path.parent, file_path.name
     
-    # Step 3 : read compressed data file
+    # Case 2: File itself is an archive
+    if _is_archive_file(file_path):
+        return file_path, _get_archive_filename(file_path)
+    
+    # Case 3: Archive is in parent directories
+    for parent in file_path.parents:
+        if _is_archive_file(parent):
+            return parent, file_path.name
+    
+    raise ValueError("file_path must be a file inside an archive file (zip or tar)")
+
+
+def _read_from_archive(archive_path: Path, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
+    """
+    Read data from archive file using the specified reader function.
+    
+    Args:
+        archive_path: Path to archive file
+        filename: Name of file to read inside archive
+        reader: Reader function to use
+        **kwargs: Additional arguments for reader
+        
+    Returns:
+        pl.DataFrame: Loaded data
+    """
     if is_zipfile(archive_path):
-        with zipfile.ZipFile(archive_path, 'r') as zf:
-            if filename is None:
-                filename = zf.namelist()[0]
-            with zf.open(filename) as f:
-                df = _get_reader_mapping(lazy)[fmt](f, **kwargs)
+        return _read_from_zip(archive_path, filename, reader, **kwargs)
     elif is_tarfile(archive_path):
-        with tarfile.TarFile(archive_path, 'r') as tf:
-            if filename is None:
-                filename = tf.getnames()[0]
-            with tf.extractfile(filename) as f:
-                df = _get_reader_mapping(lazy)[fmt](f, **kwargs)
+        return _read_from_tar(archive_path, filename, reader, **kwargs)
+    else:
+        raise ValueError(f"Unsupported archive format: {archive_path}")
+
+
+def _read_from_zip(archive_path: Path, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
+    """
+    Read data from zip archive.
     
-    return df
+    Args:
+        archive_path: Path to zip file
+        filename: Name of file to read inside zip
+        reader: Reader function to use
+        **kwargs: Additional arguments for reader
+        
+    Returns:
+        pl.DataFrame: Loaded data
+    """
+    with ZipFile(archive_path, 'r') as zf:
+        try:
+            # Try to read directly from archive
+            with zf.open(filename) as f:
+                return reader(f, **kwargs)
+        except Exception:
+            # Fallback: extract to temporary directory
+            return _extract_and_read_zip(zf, filename, reader, **kwargs)
+
+
+def _read_from_tar(archive_path: Path, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
+    """
+    Read data from tar archive.
+    
+    Args:
+        archive_path: Path to tar file
+        filename: Name of file to read inside tar
+        reader: Reader function to use
+        **kwargs: Additional arguments for reader
+        
+    Returns:
+        pl.DataFrame: Loaded data
+    """
+    with TarFile(archive_path, 'r:*') as tf:
+        try:
+            # Try to read directly from archive
+            with tf.extractfile(filename) as f:
+                return reader(f, **kwargs)
+        except Exception:
+            # Fallback: extract to temporary directory
+            return _extract_and_read_tar(tf, filename, reader, **kwargs)
+
+
+def _extract_and_read_zip(zf: ZipFile, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
+    """
+    Extract file from zip and read it.
+    
+    Args:
+        zf: ZipFile object
+        filename: Name of file to extract and read
+        reader: Reader function to use
+        **kwargs: Additional arguments for reader
+        
+    Returns:
+        pl.DataFrame: Loaded data
+    """
+    with TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir) / filename
+        zf.extract(filename, tmpdir)
+        return reader(tmp_path, **kwargs)
+
+
+def _extract_and_read_tar(tf: TarFile, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
+    """
+    Extract file from tar and read it.
+    
+    Args:
+        tf: TarFile object
+        filename: Name of file to extract and read
+        reader: Reader function to use
+        **kwargs: Additional arguments for reader
+        
+    Returns:
+        pl.DataFrame: Loaded data
+    """
+    with TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir) / filename
+        
+        # Use safe extraction if available
+        if hasattr(tarfile, 'data_filter'):
+            tf.extract(filename, tmpdir, filter='data')
+        else:
+            warnings.warn(
+                "Extracting may be unsafe; consider updating Python",
+                UserWarning,
+                stacklevel=2
+            )
+            tf.extract(filename, tmpdir)
+        
+        return reader(tmp_path, **kwargs)
 
 
 
@@ -332,19 +461,20 @@ def load_data(
     Returns:
         pl.DataFrame | pl.LazyFrame | pl.BatchedCsvReader: Loaded data
     """
-    # Step 1 : get reader function
-    reader = getreader(
-        file_path,
-        format_type=format_type,
-        in_batch=in_batch,
-        lazy=lazy,
-        focus=focus
-    )
-
-    # Step 2 : load data
-    df = reader(file_path, **kwargs)
+    # Step 1 : load data
+    if is_archive_file(file_path):
+        df = read_archive(file_path, format_type=format_type, **kwargs)
+    else:
+        reader = getreader(
+            file_path,
+            format_type=format_type,
+            in_batch=in_batch,
+            lazy=lazy,
+            focus=focus
+        )
+        df = reader(file_path, **kwargs)
     
-    # Step 3 : apply type transformation
+    # Step 2 : apply type transformation
     if transtype is not None:
         if isinstance(transtype, pl.Expr):
             df = df.with_columns(transtype)

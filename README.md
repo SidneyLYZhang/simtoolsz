@@ -34,7 +34,7 @@
 - **多格式读取**: 统一接口读取CSV、TSV、Excel、Parquet、JSON、IPC、Avro等格式
 - **Polars集成**: 基于Polars的高性能数据读取
 - **智能选择**: 根据文件扩展名自动选择合适的读取器
-- **懒加载支持**: 支持大数据集的懒加载模式
+- **Lazy加载支持**: 支持大数据集的懒加载模式
 
 ### 🛠️ 工具函数 (`simtoolsz.utils`)
 - **日期获取**: `today()` 函数，支持时区、格式化、标准datetime对象返回
@@ -102,17 +102,18 @@ result = send_email(
 from simtoolsz.reader import getreader
 import polars as pl
 
-# 读取CSV文件
+# 使用getreader读取CSV文件
 reader = getreader("data.csv")
-df = reader()
+df = reader("data.csv")
 
 # 读取TSV文件
-reader = getreader("data.tsv")
-df = reader()
+df = load_tsv("data.tsv")
 
-# 懒加载大数据集
-reader = getreader("large_data.csv", lazy=True)
-lazy_df = reader()
+# Lazy加载大数据集
+lazy_df = load_data("large_data.csv", lazy=True)
+
+# 加载压缩数据集
+df = load_data("large_data_archive.tar.gz/data.csv")
 ```
 
 ### 压缩包数据导入数据库
