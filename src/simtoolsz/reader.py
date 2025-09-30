@@ -1,10 +1,12 @@
 import warnings
 import polars as pl
+
+from polars.io.csv.batched_reader import BatchedCsvReader
+
 from pathlib import Path
 from typing import Optional, Callable
 from zipfile import ZipFile, is_zipfile
 from tarfile import TarFile, is_tarfile
-
 from tempfile import TemporaryDirectory
 
 
@@ -445,7 +447,7 @@ def load_data(
     focus: bool = False,
     transtype: pl.Expr|list[pl.Expr]|None = None,
     **kwargs
-) -> pl.DataFrame | pl.LazyFrame | pl.BatchedCsvReader:
+) -> pl.DataFrame | pl.LazyFrame | BatchedCsvReader:
     """
     Load data from a file using the appropriate reader.
 
