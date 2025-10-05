@@ -246,8 +246,6 @@ def is_archive_file(file_path: Path) -> bool:
     Returns:
         bool: True if the file is an archive file(zip or tar), False otherwise
     """
-    if not file_path.is_file():
-        return False
     return _is_archive_file(file_path) or any(
         _is_archive_file(p) for p in file_path.parents
     )
