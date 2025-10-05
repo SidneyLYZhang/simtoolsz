@@ -10,6 +10,8 @@
 
 一个简单、方便的工具集合，均是个人工作中的常用功能。对之前[pytoolsz](https://github.com/SidneyLYZhang/pytoolsz)工具包的精简重构，保留最实用的功能模块。
 
+部分功能可能还有问题，如果使用中发现问题还请反馈给我。
+
 ## 功能特性
 
 ### 🕐 时间处理 (`simtoolsz.datetime`)
