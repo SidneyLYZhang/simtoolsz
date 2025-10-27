@@ -233,6 +233,8 @@ def _is_archive_file(file_path: Path) -> bool:
     """
     if not file_path.is_file():
         return False
+    if file_path.suffix in ('.xlsx', '.xls', '.ods'):
+        return False
     return is_zipfile(file_path) or is_tarfile(file_path)
 
 
