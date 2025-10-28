@@ -12,7 +12,7 @@ from tempfile import TemporaryDirectory
 
 __all__ = [
     "read_tsv", "scan_tsv", "getreader", "load_data", "read_archive",
-    "is_archive_file"
+    "is_archive_file", "excel_sheet_names", "load_excel"
 ]
 
 def read_tsv(filepath: Path, lazy: bool = False, **kwargs
@@ -480,9 +480,92 @@ def load_data(
     if transtype is not None:
         if isinstance(transtype, pl.Expr):
             df = df.with_columns(transtype)
-        elif isinstance(transtype, list):
+        if isinstance(transtype, list):
             df = df.with_columns(*transtype)
-        else:
-            raise ValueError("transtype must be a polars expression or a list of polars expressions")
-    
+    return df
+
+def excel_sheet_names(
+    file_path: Path | str
+) -> list[str]:
+    """
+    Get the names of all sheets in an Excel file.
+
+    Args:
+        file_path: Path to the Excel file
+        
+    Returns:
+        list[str]: Names of all sheets in the Excel file
+    """
+    with ZipFile(file_path, 'r') as zf:
+        xml_content = zf.read("xl/workbook.xml").decode('utf-8')
+        sheet_names = re.findall(r'<sheet name="([^"]+)"', xml_content)
+    return sheet_names
+
+def _get_excel_samecolumns_sheet(
+    file_path: Path | str
+) -> list[list[str]] :
+    """
+    Get the names of all sheets in an Excel file that have the same columns.
+
+    Args:
+        file_path: Path to the Excel file
+        
+    Returns:
+        list[list[str]]: Names of all sheets in the Excel file that have the same columns.
+    """
+    sheet_names = excel_sheet_names(file_path)
+    if len(sheet_names) == 0:
+        raise ValueError("Excel file has no sheets")
+    if len(sheet_names) == 1:
+        return sheet_names
+    sheet_cols = {
+        sn: pl.read_excel(file_path, sheet_name=sn).columns
+        for sn in sheet_names
+    }
+    grouped = {}
+    for k, v in sheet_cols.items():
+        grouped.setdefault(v, []).append(k)
+    return list(grouped.values())
+
+
+def load_excel(
+    file_path: Path | str,
+    sheet_name: str = "Sheet1",
+    **kwargs
+) -> pl.DataFrame:
+    """
+    Load data from an Excel file.
+
+    Args:
+        file_path: Path to the Excel file
+        sheet_name: Name of the sheet to load (default: "Sheet1"), 
+                    special value "@all" load all sheets,"@most" load sheets with most columns
+        **kwargs: Additional arguments to pass to polars.read_excel
+        
+    Returns:
+        pl.DataFrame: Loaded data
+    """
+    sheet_names = excel_sheet_names(file_path)
+    sheet_parts = _get_excel_samecolumns_sheet(file_path)
+    if sheet_name.lower() == "@all" :
+        if len(sheet_parts) != 1 :
+            raise ValueError("Excel file has multiple sheets with different columns")
+        df = pl.concat([
+            pl.read_excel(file_path, sheet_name=sn, **kwargs)
+            for sn in sheet_names
+        ])
+        return df
+    elif sheet_name.lower() == "@most" :
+        sheet_name = []
+        for i in sheet_parts:
+            if len(i) > len(sheet_name):
+                sheet_name = i
+        df = pl.concat([
+            pl.read_excel(file_path, sheet_name=sn, **kwargs)
+            for sn in sheet_name
+        ])
+    elif sheet_name in sheet_names:
+        df = pl.read_excel(file_path, sheet_name=sheet_name, **kwargs)
+    else:
+        raise ValueError(f"Sheet {sheet_name} not found in Excel file")
     return df
