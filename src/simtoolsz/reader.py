@@ -525,7 +525,8 @@ def _get_excel_samecolumns_sheet(
     }
     grouped = {}
     for k, v in sheet_cols.items():
-        grouped.setdefault(v, []).append(k)
+        key = tuple(v) if isinstance(v, list) else v
+        grouped.setdefault(key, []).append(k)
     return list(grouped.values())
 
 
