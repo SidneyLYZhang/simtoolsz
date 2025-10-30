@@ -1,4 +1,5 @@
 import warnings
+import re
 import polars as pl
 
 from polars.io.csv.batched_reader import BatchedCsvReader
