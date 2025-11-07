@@ -5,14 +5,15 @@ import simtoolsz.mail as mail
 import simtoolsz.utils as utils
 import simtoolsz.datetime as datetime
 import simtoolsz.reader as reader
+import simtoolsz.countrycode as countrycode
 
 
 try:
     __version__ = importlib.metadata.version("simtoolsz")
 except importlib.metadata.PackageNotFoundError:
-    __version__ = "0.2.11.2"
+    __version__ = "0.2.12"
 
 __all__ = [
-    '__version__', 'mail', 'utils', 'datetime', 'db', 'reader'
-
+    '__version__', 'mail', 'utils', 'datetime',
+    'db', 'reader', 'countrycode'
 ]

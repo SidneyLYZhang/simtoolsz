@@ -10,13 +10,27 @@
 #   universal: false
 
 -e file:.
+country-converter==1.3.2
+    # via simtoolsz
 duckdb==1.4.0
     # via simtoolsz
+numpy==2.3.4
+    # via pandas
+pandas==2.3.3
+    # via country-converter
 pendulum==3.1.0
     # via simtoolsz
+polars==1.35.1
+    # via simtoolsz
+polars-runtime-32==1.35.1
+    # via polars
 python-dateutil==2.9.0.post0
+    # via pandas
     # via pendulum
+pytz==2025.2
+    # via pandas
 six==1.17.0
     # via python-dateutil
 tzdata==2025.2
+    # via pandas
     # via pendulum
