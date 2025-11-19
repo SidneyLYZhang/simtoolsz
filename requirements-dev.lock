@@ -24,6 +24,8 @@ polars==1.35.1
     # via simtoolsz
 polars-runtime-32==1.35.1
     # via polars
+pycountry==24.6.1
+    # via simtoolsz
 python-dateutil==2.9.0.post0
     # via pandas
     # via pendulum
