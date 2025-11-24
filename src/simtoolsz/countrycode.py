@@ -1,88 +1,103 @@
-from typing import Iterable, Union, List, Optional
 import re
+import json
 import polars as pl
-import pycountry as pct
+
+from pathlib import Path
+from functools import reduce
+from typing import Iterable
 
 
-class CountryCodeConverter:
+UNIQUE_IDS = ['ISO2','ISO3',"name_short","name_zh","official_name_zh","name_official"]
+codedata = Path(__file__).parent / "country.parquet"
+infodata = Path(__file__).parent / "columns_info"
+
+CTN = {
+    "name" : ["name_short","name_zh","official_name_zh","name_official"],
+    "ISO2" : ["ISO2","alpha_2"],
+    "ISO3" : ["ISO3","alpha_3"],
+    "ISOnumeric" : ["ISOnumeric","ISOnum"]
+}
+
+class CountryCode:
     """
     国家代码转换器类，提供各种国家代码格式之间的转换功能。
     """
     
-    # 支持的转换目标类型
-    SUPPORTED_TARGETS = [
-        'APEC', 'BASIC', 'BRIC', 'CC41', 'CIS', 'Cecilia2050', 'Continent_7',
-        'DACcode', 'EEA', 'EU', 'EU12', 'EU15', 'EU25', 'EU27', 'EU27_2007',
-        'EU28', 'EURO', 'EXIO1', 'EXIO1_3L', 'EXIO2', 'EXIO2_3L', 'EXIO3',
-        'EXIO3_3L', 'Eora', 'FAOcode', 'G20', 'G7', 'GBDcode', 'GWcode', 'IEA',
-        'IMAGE', 'IOC', 'ISO2', 'ISO3', 'ISOnumeric', 'MESSAGE', 'OECD',
-        'REMIND', 'Schengen', 'UN', 'UNcode', 'UNmember', 'UNregion', 'WIOD',
-        'ccTLD', 'continent', 'name_official', 'name_short', 'obsolete', 'regex',
-        'alpha_2', 'alpha_3', 'numeric', 'ISO', 'name'
-    ]
-    
-    # 特殊地区映射
-    SPECIAL_TERRITORIES = {
-        "zh": {
-            "香港": "中国香港",
-            "澳门": "中国澳门",
-            "Macao": "Macao ,China",
-            "Hong Kong": "Hong Kong ,China", 
-            "Hongkong": "Hongkong ,China",
-            "Macau": "Macau ,China"
-        },
-        "en": {
-            "香港": "Hong Kong ,China",
-            "澳门": "Macao ,China"
-        }
-    }
-    
-    # 科索沃特殊处理
-    KOSOVO_CODES = ["XK", "XKS"]
-    KOSOVO_NAMES = {"zh": "科索沃", "en": "Kosovo"}
-    
-    def __init__(self, additional_data: Optional[pl.DataFrame] = None):
+    def __init__(
+        self, 
+        additional_data: pl.DataFrame|dict[str, list|pl.Series]|None = None
+    ) -> None :
         """
         初始化转换器。
         
         Args:
-            additional_data: 额外的数据，用于country_converter
+            additional_data: 额外的数据, 用于补充ISO3166的代码数据不包含的情况。
         """
-        self.converter = coco.CountryConverter(additional_data=additional_data)
+        if isinstance(additional_data, dict):
+            idx = list(additional_data.keys())
+        elif isinstance(additional_data, pl.DataFrame):
+            idx = additional_data.columns
+        else:
+            raise ValueError("additional_data 必须是 DataFrame 或 dict 类型")
+        if not any([i in UNIQUE_IDS for i in idx]):
+            raise ValueError(f"additional_data 信息必须至少包含一个唯一标识类型 {UNIQUE_IDS}")
+        data = pl.DataFrame(additional_data) if isinstance(additional_data, dict) else additional_data
+        self._add_data = data
+        self._data = pl.scan_parquet(codedata)
     
-    def _get_localized_name(self, code: str, language: str = "zh", 
-                           not_found: Optional[str] = None) -> str:
+    @staticmethod
+    def search_info(colname:str) -> str:
         """
-        获取指定语言的国家名称。
-        
-        Args:
-            code: ISO3国家代码
-            language: 语言代码
-            not_found: 未找到时的返回值
-            
-        Returns:
-            本地化的国家名称
+        进行可转换信息的说明。
         """
-        # 特殊地区处理
-        if code in self.SPECIAL_TERRITORIES.get(language, {}):
-            return self.SPECIAL_TERRITORIES[language][code]
-            
-        try:
-            translator = gettext.translation('iso3166-1', pct.LOCALES_DIR, 
-                                           languages=[language])
-            translator.install()
-            return translator.gettext(code)
-        except:
-            return code if not_found is None else not_found
+        with open(infodata, "r", encoding="utf-8") as f:
+            colinf = json.load(f)
+        for k,v in CTN.items():
+            if colname in v:
+                return colinf.get(k, f"未找到关于 {colname} 的信息")
+        if colname.lower() == "all":
+            return ", ".join(colinf.keys())
+        return colinf.get(colname, f"未找到关于 {colname} 的信息")
     
-    def convert(self, code: Union[str, Iterable[str]], to: str = "name_zh",
-                not_found: Optional[str] = None, use_regex: bool = False) -> Union[str, List[str]]:
+    @staticmethod
+    def _guess_source(code: int|str|Iterable[str|int]) -> str:
+        """
+        自动识别输入代码的格式。
+        """
+        if isinstance(code, int):
+            return "ISOnumeric"
+        elif isinstance(code, str):
+            return "ISO2" if len(code) == 2 else "ISO3"
+        elif isinstance(code, Iterable):
+            if all(isinstance(i, int) for i in code if i is not None) :
+                return "ISOnumeric"
+            elif all(isinstance(i, str) for i in code if i is not None):
+                if any([len(c) == 2 for c in code]):
+                    return "ISO2"
+                elif any([len(c) == 3 for c in code]):
+                    return "ISO3"
+                else:
+                    return "regex"
+            else:
+                return "regex"
+        else:
+            raise ValueError("无法确定的代码格式，请自主指定适合的类型")
+    
+    def _get_data
+    
+    def convert(
+        self, code: int|str|Iterable[str|int], 
+        source: str = "auto", target: str = "name_zh",
+        not_found: str|None = None, 
+        use_regex: bool = False
+    ) -> str|list[str]:
         """
         转换国家代码到指定格式。
         
         Args:
             code: 输入的国家代码（字符串或迭代器）
-            to: 目标格式
+            source: 源格式, 默认为"auto"，即自动识别
+            target: 目标格式, 默认为"name_zh"，即转换为中文通称
             not_found: 未找到时的返回值
             use_regex: 是否使用正则表达式匹配
             
@@ -92,73 +107,59 @@ class CountryCodeConverter:
         Raises:
             ValueError: 当目标格式不支持时
         """
-        # 验证目标格式
-        if to not in self.SUPPORTED_TARGETS and not re.match(r"^name_.", to):
-            raise ValueError(f"不支持的目标格式: {to}")
+        # 确认原始格式
+        if source == "auto":
+            src = self._guess_source(code)
+        elif source in reduce(lambda x,y:x+y,CTN.values()):
+            for k,v in CTN.items():
+                if source in v and k != "name":
+                    src = k
+                    break
+                elif source in v and k == "name":
+                    src = source
+                    break
+        else :
+            src = source
         
-        # 处理name_xx格式
-        language = None
-        target_format = to
-        if re.match(r"^name_.", to):
-            language = to.split("_")[1]
-            target_format = "ISO3"
+        # 确认目标格式
+        if target =="name" :
+            tgt = "name_short"
+        elif target in reduce(lambda x,y:x+y,CTN.values()):
+            for k,v in CTN.items():
+                if target in v:
+                    tgt = k
+                    break
         
-        # 特殊处理科索沃
-        if isinstance(code, str) and code.upper() in self.KOSOVO_CODES:
-            if language:
-                return self.KOSOVO_NAMES.get(language, self.KOSOVO_NAMES["en"])
-            return code if not_found is None else not_found
-        
-        # 使用country_converter进行转换
-        kwargs = {"names": code, "to": target_format, "not_found": not_found}
-        if use_regex:
-            kwargs["src"] = "regex"
-            
-        result = self.converter.convert(**kwargs)
-        
-        # 如果需要本地化名称
-        if language:
-            if isinstance(result, str):
-                result = self._get_localized_name(result, language, not_found)
+        # 进行转化
+        if use_regex :
+            if isinstance(code, Iterable):
+                return 
             else:
-                result = [self._get_localized_name(name, language, not_found) 
-                         for name in result]
-        
-        return result
+                return self.convert(code, src, tgt, not_found, use_regex)
+        else:
+            if isinstance(code, Iterable):
+                return [self.convert(c, src, tgt, not_found, use_regex) for c in code]
+            else:
+                return self.convert(code, src, tgt, not_found, use_regex)
 
 
-def local_name(code: str, local: str = "zh", not_found: Optional[str] = None) -> str:
+
+def convert_country_code(
+    code: str|Iterable[str], 
+    src:str = "ISO3", to: str = "name_zh",
+    not_found: str|None = None
+) -> str|List[str] :
     """
-    转换国家代码为指定语言的国家名称（兼容旧接口）。
-    
-    Args:
-        code: 国家代码
-        local: 语言代码
-        not_found: 未找到时的返回值
-        
-    Returns:
-        本地化的国家名称
-    """
-    converter = CountryCodeConverter()
-    return converter.convert(code, f"name_{local}", not_found)
-
-
-def convert_country_code(code: Union[str, Iterable[str]], to: str = "name_zh",
-                        additional_data: Optional[pl.DataFrame] = None,
-                        not_found: Optional[str] = None, 
-                        use_regex: bool = False) -> Union[str, List[str]]:
-    """
-    转换各类国家代码到指定类型（兼容旧接口）。
+    转换各类国家代码到指定类型——快捷函数。
     
     Args:
         code: 输入的国家代码
-        to: 目标格式
-        additional_data: 额外的数据（polars.DataFrame）
+        src: 源格式, 默认为"ISO3"
+        to: 目标格式, 默认为"name_zh"
         not_found: 未找到时的返回值
-        use_regex: 是否使用正则表达式匹配
         
     Returns:
         转换后的国家代码
     """
-    converter = CountryCodeConverter(additional_data)
-    return converter.convert(code, to, not_found, use_regex)
+    converter = CountryCode()
+    return converter.convert(code, source=src, target=to, not_found=not_found)

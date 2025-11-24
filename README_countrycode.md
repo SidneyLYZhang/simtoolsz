@@ -52,5 +52,7 @@
 45. [BRICS](https://infobrics.org/en/) 金砖国家组织。
 46. [ASEAN](https://asean.org/) 东南亚国家联盟。
 47. [SCO](https://chn.sectsco.org/) 上海合作组织。
-48. [SAARC](https://www.saarc-sec.org/) 南亚区域合作联盟。
+48. [OPEC](https://www.opec.org/) 石油输出国组织。
+49. [RCEP](https://en.wikipedia.org/wiki/Regional_Comprehensive_Economic_Partnership) 区域合作经济伙伴关系（RCEP）。
+
 
