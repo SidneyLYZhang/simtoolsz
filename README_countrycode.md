@@ -54,5 +54,6 @@
 47. [SCO](https://chn.sectsco.org/) 上海合作组织。
 48. [OPEC](https://www.opec.org/) 石油输出国组织。
 49. [RCEP](https://en.wikipedia.org/wiki/Regional_Comprehensive_Economic_Partnership) 区域合作经济伙伴关系（RCEP）。
+50. [ISO-4217 Currency Code](https://www.iso.org/iso-4217-currency-codes.html) 国际标准化组织（ISO）货币代码（4217）基于对应国家，含货币名称。
 
 

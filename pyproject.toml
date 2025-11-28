@@ -35,9 +35,9 @@ Issues = "https://github.com/SidneyLYZhang/simtoolsz/issues"
 requires = ["hatchling==1.26.3", "hatch-vcs"]
 build-backend = "hatchling.build"
 
-[tool.rye]
-managed = true
-dev-dependencies = []
+# [tool.rye]
+# managed = true
+# dev-dependencies = []
 
 [tool.hatch.metadata]
 allow-direct-references = true
