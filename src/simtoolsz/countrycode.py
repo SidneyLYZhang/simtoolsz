@@ -4,7 +4,7 @@ import polars as pl
 
 from pathlib import Path
 from functools import reduce
-from typing import Any
+from typing import Any, Iterable
 
 __all__ = ["CountryCode","is_data_container","country_convert"]
 
@@ -28,8 +28,8 @@ valid_trans = {
 
 def is_data_container(data: Any) -> bool:
     # 处理各种数据容器
-    if hasattr(data, 'shape') and hasattr(data, 'columns'):
-        # 检测 pandas/polars DataFrame
+    if hasattr(data, 'shape'):
+        # 检测 pandas/polars DataFrame 或 Series
         return True
     elif isinstance(data, (list, tuple, set, dict)):
         return True
@@ -41,20 +41,30 @@ class CountryCode:
     国家代码转换器类，提供各种国家代码格式之间的转换功能。
     """
     
-    def __init__(self) -> None :
+    def __init__(self, additional_data: Any = None) -> None :
         """
         初始化转换器。
         """
         self._data = pl.scan_parquet(codedata)
+        self._add_data = additional_data
+        
+        # 处理regex列，过滤掉None值
+        regex_list = self._data.select(pl.col("regex")).collect()["regex"].to_list()
         self._reges = [
             re.compile(entry, re.IGNORECASE) 
-            for entry in self._data.select(pl.col("regex")).collect()["regex"].to_list()]
+            for entry in regex_list if entry is not None]
+        
+        # 处理ISO2列，过滤掉None值
+        iso2_list = self._data.select(pl.col("ISO2")).collect()["ISO2"].to_list()
         self._reges_ISO2 = [
             re.compile(entry, re.IGNORECASE) 
-            for entry in self._data.select(pl.col("ISO2")).collect()["ISO2"].to_list()]
+            for entry in iso2_list if entry is not None]
+        
+        # 处理ISO3列，过滤掉None值
+        iso3_list = self._data.select(pl.col("ISO3")).collect()["ISO3"].to_list()
         self._reges_ISO3 = [
             re.compile(entry, re.IGNORECASE) 
-            for entry in self._data.select(pl.col("ISO3")).collect()["ISO3"].to_list()]
+            for entry in iso3_list if entry is not None]
     
     @property
     def all_valid_class(self) -> list[str] :
@@ -75,7 +85,7 @@ class CountryCode:
         """
         with open(infodata, "r", encoding="utf-8") as f:
             colinf = json.load(f)
-        for k,v in CTN.items():
+        for k,v in valid_trans.items():
             if colname in v:
                 return colinf.get(k, f"未找到关于 {colname} 的信息")
         if colname.lower() == "all":
@@ -92,29 +102,55 @@ class CountryCode:
                 int(xc)
                 return "ISOnumeric"
             except ValueError:
-                if len(xc) == 2:
+                if len(str(xc)) == 2:
                     return "ISO2"
-                elif len(xc) == 3:
+                elif len(str(xc)) == 3:
                     return "ISO3"
                 else:
                     return "regex"
         
-        if isinstance(code, Iterable):
-            return [_guess_single(i) for i in code]
-        else:
+        if isinstance(code, str) or isinstance(code, int):
+            # 单个字符串或整数
             return _guess_single(code)
+        else:
+            try:
+                # 检查是否为可迭代对象（但不是字符串）
+                iter(code)
+                return [_guess_single(i) for i in code]
+            except TypeError:
+                # 不是可迭代对象，直接处理
+                return _guess_single(code)
     
     def _get_valid_codename(self, src:str) -> str :
-        lower_case_valid_class = [et.lower() for et in self.core_valid_class]
+        original_src = src
+        lower_src = src.lower()
+        
+        # 先尝试将别名转换为标准名称
         for k,v in valid_trans.items():
-            if src.lower() in v:
+            # 将值列表中的元素转换为小写进行比较
+            if lower_src in [alias.lower() for alias in v]:
                 src = k
                 break
-        try:
-            validated_para = self.core_valid_class[lower_case_valid_class.index(src.lower())]
-        except ValueError:
-            raise ValueError(f"无法识别的参数 {src}")
-        return validated_para
+        
+        # 检查转换后的名称是否是我们支持的标准名称之一
+        if src in valid_trans or src in self.core_valid_class:
+            return src
+        
+        # 检查原始名称是否在核心有效类别中
+        if original_src in self.core_valid_class:
+            return original_src
+        
+        # 检查小写形式
+        lower_case_valid_class = [et.lower() for et in self.core_valid_class]
+        if lower_src in lower_case_valid_class:
+            return self.core_valid_class[lower_case_valid_class.index(lower_src)]
+        
+        # 检查小写形式是否是我们支持的标准名称之一
+        for k in valid_trans:
+            if lower_src == k.lower():
+                return k
+        
+        raise ValueError(f"无法识别的参数 {original_src}")
     
     def _which_regex(self, colname: str) -> list[re.Pattern] | None :
         """
@@ -136,8 +172,11 @@ class CountryCode:
         """LazyFrame的查找"""
         res = pl.DataFrame()
         if use_regex :
-            for i,irex in enumerate(self._which_regex(colname)):
-                if irex.search(str(txt)):
+            clength = len(self._data.select(pl.col(colname)).collect())
+            for i in range(clength):
+                row = self._data.slice(i, 1).collect()
+                irex = self._which_regex(colname)[i] if i < len(self._which_regex(colname)) else None
+                if irex and irex.search(str(txt)):
                     res = pl.concat([res, row])
         else :
             clength = len(self._data.select(pl.col(colname)).collect())
@@ -157,7 +196,7 @@ class CountryCode:
         return self._data.select(pl.col(oricols)).drop_nulls().collect()
     
     def convert(
-        self, code: int|str, 
+        self, code: int|str|Iterable[str|int], 
         source: str = "auto", target: str = "name_zh",
         not_found: str|None = None, 
         use_regex: bool = False
@@ -166,7 +205,7 @@ class CountryCode:
         转换国家代码到指定格式。
         
         Args:
-            code: 输入的国家代码（字符串或迭代器）
+            code: 输入的国家代码（字符串、整数或可迭代对象）
             source: 源格式, 默认为"auto"，即自动识别
             target: 目标格式, 默认为"name_zh"，即转换为中文通称
             not_found: 未找到时的返回值
@@ -178,21 +217,18 @@ class CountryCode:
         Raises:
             ValueError: 当目标格式不支持时
         """
-        # 确认原始格式
-        if source == "auto":
-            src = self._guess_source(code)
-        elif source in reduce(lambda x,y:x+y,valid_trans.values()):
-            for k,v in valid_trans.items():
-                if source in v:
-                    src = k
-                    break
-        else :
-            src = source
+        # 处理单个值和可迭代对象的情况
+        is_single = False
+        if isinstance(code, (str, int)):
+            is_single = True
+            code_list = [code]
+        else:
+            code_list = list(code)
         
         # 确认目标格式
-        if target =="name" :
+        if target == "name":
             tgt = "name_short"
-        elif target in reduce(lambda x,y:x+y,valid_trans.values()):
+        elif target in reduce(lambda x,y: x+y, valid_trans.values()):
             for k,v in valid_trans.items():
                 if target in v:
                     tgt = k
@@ -200,14 +236,38 @@ class CountryCode:
         else:
             tgt = target
         
-        # 进行转化
-        res = self._lazy_find(code, code, src, use_regex)
-        if len(res) == 0:
-            return not_found
+        results = []
+        for single_code in code_list:
+            # 确认原始格式
+            if source == "auto":
+                src = self._guess_source(single_code)
+            elif source in reduce(lambda x,y: x+y, valid_trans.values()):
+                for k,v in valid_trans.items():
+                    if source in v:
+                        src = k
+                        break
+            else:
+                src = source
+            
+            # 进行转化
+            if use_regex:
+                # 当使用正则表达式时，colname应该是'regex'
+                res = self._lazy_find(single_code, 'regex', use_regex)
+            else:
+                # 否则，colname是源格式
+                res = self._lazy_find(single_code, src, use_regex)
+            
+            if len(res) == 0:
+                results.append(not_found)
+            else:
+                if len(res) > 1:
+                    print(f"警告：输入 {single_code} 对应多个国家代码，仅返回第一个结果")
+                results.append(res[tgt].to_list()[0])
+        
+        if is_single:
+            return results[0]
         else:
-            if len(res) > 1 :
-                print(f"警告：输入 {code} 对应多个国家代码，仅返回第一个结果")
-            return res[tgt].to_list()[0]
+            return results
     
     def covert_series(
         self, series: Any, 
@@ -257,7 +317,7 @@ def country_convert(
     not_found: str|None = None,
     use_regex: bool = False,
     additional_data: dict|pl.DataFrame|None = None
-) -> str|List[str] :
+) -> str|list[str] :
     """
     转换各类国家代码到指定类型——快捷函数。
     
@@ -273,10 +333,12 @@ def country_convert(
     converter = CountryCode(additional_data)
     if is_data_container(txt) :
         if hasattr(txt, 'shape') and hasattr(txt, 'columns'):
+            # 处理DataFrame
             return converter.covert_series(
                     txt[src], source=src, target=to, 
                     not_found=not_found, use_regex=use_regex, out_type="list")
         elif isinstance(txt, dict) :
+            # 处理字典
             temp = txt[src]
             if isinstance(temp, (list, tuple, set, pl.Series)):
                 return converter.covert_series(
@@ -287,4 +349,15 @@ def country_convert(
                 return converter.convert(
                     temp, source=src, target=to, 
                     not_found=not_found, use_regex=use_regex)
+        elif isinstance(txt, pl.Series):
+            # 处理Series
+            return converter.covert_series(
+                txt, source=src, target=to, 
+                not_found=not_found, use_regex=use_regex, out_type="list")
+        elif isinstance(txt, (list, tuple, set)):
+            # 处理列表、元组、集合
+            return converter.covert_series(
+                txt, source=src, target=to, 
+                not_found=not_found, use_regex=use_regex, out_type="list")
+    # 处理单个值
     return converter.convert(txt, source=src, target=to, not_found=not_found, use_regex=use_regex)

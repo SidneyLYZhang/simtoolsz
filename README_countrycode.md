@@ -1,8 +1,175 @@
-# 国家代码转换相关说明
+# 国家代码转换模块 - CountryCode
 
-这里尽可能多的收集了各种国际组织、国际标准的代码，以及各种国家组织的成员信息，并尽可能包含了加入时间等信息。
+## 简介
 
-详细代码代表的含义，可以从程序中使用函数读取。这里对目前已包含的信息进行将要说明：
+CountryCode 是一个功能强大的国家代码转换模块，支持多种国际组织、国际标准的国家代码之间的转换。该库收集了各种国际组织、国际标准的代码，以及各种国家组织的成员信息，并尽可能包含了加入时间等信息。
+
+## 安装
+
+```bash
+pip install simtoolsz
+```
+
+## 核心功能
+
+- 支持多种国家代码格式之间的转换
+- 自动识别输入代码格式
+- 支持批量转换
+- 支持正则表达式匹配
+- 支持多种数据类型输入（字符串、列表、元组、集合、字典、DataFrame、Series）
+
+## 快速开始
+
+### 基本使用
+
+```python
+from simtoolsz.countrycode import country_convert
+
+# 单个国家代码转换
+country_convert("CHN", src="ISO3", to="name_zh")  # 输出: "中国"
+country_convert("CN", src="ISO2", to="ISO3")  # 输出: "CHN"
+
+# 批量转换
+country_convert(["CHN", "USA", "JPN"], src="ISO3", to="name_zh")  # 输出: ["中国", "美国", "日本"]
+
+# 自动识别源格式
+country_convert("CN", to="name_zh")  # 输出: "中国"
+```
+
+### 使用 CountryCode 类
+
+```python
+from simtoolsz.countrycode import CountryCode
+
+# 初始化转换器
+converter = CountryCode()
+
+# 转换国家代码
+converter.convert("CHN", source="ISO3", target="name_zh")  # 输出: "中国"
+
+# 转换可迭代对象
+converter.covert_series(["CHN", "USA", "JPN"], source="ISO3", target="name_zh")
+```
+
+## API 文档
+
+### 核心类
+
+#### CountryCode
+
+国家代码转换器模块，提供各种国家代码格式之间的转换功能。
+
+##### 初始化
+
+```python
+CountryCode(additional_data: dict|pl.DataFrame|None = None)
+```
+
+- `additional_data`：额外的数据，用于扩展国家代码信息
+
+##### 属性
+
+- `all_valid_class`：获取所有有效类别
+- `core_valid_class`：获取核心有效类别
+
+##### 方法
+
+###### search_info
+
+```python
+@staticmethod
+CountryCode.search_info(colname: str) -> str
+```
+
+搜索指定列名的信息说明。
+
+- `colname`：列名
+- 返回：列名的信息说明
+
+###### convert
+
+```python
+def convert(self, code: int|str|Iterable[str|int], 
+            source: str = "auto", target: str = "name_zh",
+            not_found: str|None = None, 
+            use_regex: bool = False) -> str|list[str]
+```
+
+转换国家代码到指定格式。
+
+- `code`：输入的国家代码（字符串、整数或可迭代对象）
+- `source`：源格式，默认为"auto"，即自动识别
+- `target`：目标格式，默认为"name_zh"，即转换为中文通称
+- `not_found`：未找到时的返回值
+- `use_regex`：是否使用正则表达式匹配
+- 返回：转换后的国家代码（字符串或列表）
+
+###### covert_series
+
+```python
+def covert_series(self, series: Any, 
+                  source: str = "auto", target: str = "name_zh",
+                  not_found: str|None = None, 
+                  use_regex: bool = False,
+                  out_type: str = "series") -> pl.Series | pl.DataFrame | list[Any]
+```
+
+转换可迭代对象中的国家代码。
+
+- `series`：输入的可迭代对象（字符串或整数）
+- `source`：源格式，默认为"auto"，即自动识别
+- `target`：目标格式，默认为"name_zh"，即转换为中文通称
+- `not_found`：未找到时的返回值
+- `use_regex`：是否使用正则表达式匹配
+- `out_type`：输出类型，默认为"series"，即返回Series；可选"dataframe"，返回DataFrame；可选"list"，返回列表
+- 返回：转换后的国家代码（Series，DataFrame或List）
+
+###### get_
+
+```python
+def get_(self, ctype_: str, extra: list[str]|None = None) -> pl.DataFrame
+```
+
+获取指定国家代码的核心信息。
+
+- `ctype_`：国家代码类型
+- `extra`：额外的列名列表
+- 返回：包含指定国家代码核心信息的DataFrame
+
+### 核心函数
+
+#### country_convert
+
+```python
+def country_convert(txt: str|Iterable[str|int], 
+                    src: str = "ISO3", to: str = "name_zh",
+                    not_found: str|None = None,
+                    use_regex: bool = False,
+                    additional_data: dict|pl.DataFrame|None = None) -> str|list[str]
+```
+
+转换各类国家代码到指定类型的快捷函数。
+
+- `txt`：输入的国家代码
+- `src`：源格式，默认为"ISO3"，可选自动方式"auto"
+- `to`：目标格式，默认为"name_zh"
+- `not_found`：未找到时的返回值
+- `use_regex`：是否使用正则表达式匹配
+- `additional_data`：额外的数据，用于扩展国家代码信息
+- 返回：转换后的国家代码
+
+#### is_data_container
+
+```python
+def is_data_container(data: Any) -> bool
+```
+
+检查是否为数据容器。
+
+- `data`：要检查的数据
+- 返回：如果是数据容器则返回True，否则返回False
+
+## 支持的代码类型
 
 1.  ISO2 (ISO 3166-1 alpha-2) - 国际标准化组织（ISO）国家代码 - 字母编码（2位），包括使用 UK/EL 指代英国/希腊的情况（但需始终转换为 GB/GR）
 2.  ISO3 (ISO 3166-1 alpha-3) 国际标准化组织（ISO）国家代码 - 字母编码（3位）
@@ -56,4 +223,51 @@
 49. [RCEP](https://en.wikipedia.org/wiki/Regional_Comprehensive_Economic_Partnership) 区域合作经济伙伴关系（RCEP）。
 50. [ISO-4217 Currency Code](https://www.iso.org/iso-4217-currency-codes.html) 国际标准化组织（ISO）货币代码（4217）基于对应国家，含货币名称。
 
+## 高级用法
 
+### 使用正则表达式匹配
+
+```python
+from simtoolsz.countrycode import country_convert
+
+# 使用正则表达式匹配
+country_convert("China", src="regex", to="ISO3", use_regex=True)  # 输出: "CHN"
+```
+
+### 处理未找到的情况
+
+```python
+from simtoolsz.countrycode import country_convert
+
+# 设置未找到时的返回值
+country_convert("XYZ", src="ISO3", to="name_zh", not_found="未知国家")  # 输出: "未知国家"
+```
+
+## 注意事项
+
+1. 当使用自动识别源格式（`src="auto"`）时，会根据输入代码的长度和格式进行判断
+2. 支持的输入数据类型包括：字符串、列表、元组、集合、字典、DataFrame、Series
+3. 批量转换时，返回值的类型与输入值的类型相对应
+4. 当使用正则表达式匹配时，可能会返回多个结果，此时会输出警告并返回第一个结果
+
+## 许可证
+
+本项目采用 MulanPSL-2.0 许可证。
+
+## 更新日志
+
+### 0.2.12
+
+- 修复了正则表达式编译时的 None 值处理
+- 修复了 __init__ 方法参数问题
+- 修复了 is_data_container 函数对 Series 的处理
+- 修复了未定义的 CTN 变量
+- 修复了未定义的 row 变量
+- 修复了 convert 方法中的参数顺序问题
+- 优化了 _guess_source 方法
+- 优化了 _get_valid_codename 方法
+- 优化了 country_convert 函数
+
+## 联系方式
+
+如有问题或建议，请提交 Issue 到 GitHub 仓库。

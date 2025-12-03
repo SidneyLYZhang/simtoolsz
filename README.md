@@ -44,6 +44,12 @@
 - **文件夹操作**: `checkFolders()` 批量文件夹检查和创建
 - **文件查找**: `lastFile()` 基于时间或大小的文件查找
 
+### 国家代码转换 (`simtoolsz.countrycode`)
+- **国家名称到代码**: 支持将国家名称转换为对应的ISO 3166-1 alpha-2代码
+- **代码到国家名称**: 支持将ISO 3166-1 alpha-2代码转换为国家名称
+- **G7/G20国家列表**: 提供G7和G20国家的代码列表
+- **多类型国家代码转换**：支持类型丰富，详细可见[代码转换模块说明](README_countrycode.md)
+
 ## 安装
 
 ```bash
@@ -145,4 +151,21 @@ formatted = today(fmt="YYYY年MM月DD日 HH:mm:ss")
 # 列表查找
 result = take_from_list("hello", ["he", "world"])  # 返回 "he"
 result = take_from_list([2, 3], [1, 2, 3, 4])    # 返回 2
+```
+### 国家代码转换
+```python
+from simtoolsz.countrycode import CountryCode
+
+# 初始化国家代码转换工具
+cc = CountryCode()
+
+# 转换国家名称到代码
+code = cc.convert("中国")  # 返回 "CN"
+
+# 转换代码到国家名称
+name = cc.convert("US", target="name")  # 返回 "United States"
+
+# 获取G7国家列表
+g7 = cc.convert("G7", target="name")
+print(g7)
 ```
