@@ -10,7 +10,7 @@ T = TypeVar('T')
 
 __all__ = [
     'take_from_list', 'Number', 'today', 'PathLike', 'FolderPaths', 'CheckResult',
-    'checkFolders', 'lastFile'
+    'checkFolders', 'lastFile', 'yesterday'
 ]
 
 Number = NewType('Number', int | float | complex)
@@ -123,6 +123,69 @@ def today(tz: Optional[str] = None,
     
     # 获取日期时间对象
     res = plm.now(tz=xtz) if addtime else plm.today(tz=xtz)
+    
+    # 如果需要格式化，直接返回格式化字符串
+    if fmt:
+        return res.format(fmt)
+    
+    # 如果需要标准 datetime 对象
+    if return_std:
+        return dt(
+            res.year, res.month, res.day,
+            res.hour, res.minute, res.second, res.microsecond,
+            tzinfo=res.tzinfo
+        )
+    
+    # 返回 pendulum DateTime 对象
+    return res
+
+def yesterday(
+    tz: Optional[str] = None,
+    fmt: Optional[str] = None,
+    addtime: bool = False,
+    return_std: bool = False
+) -> Union[str, plm.DateTime, dt]:
+    """
+    获取昨日日期或一个自然日前的日期时间。
+    
+    根据参数返回昨日日期或一个自然日前的日期时间，支持指定时区和格式化字符串。
+    
+    Args:
+        tz: 时区名称，如 'Asia/Shanghai'、'UTC' 等。如果为 None，使用本地时区
+        fmt: 格式化字符串，如 'YYYY-MM-DD'、'YYYY-MM-DD HH:mm:ss' 等。如果为 None，返回 pendulum.DateTime 对象
+        addtime: 是否包含时间部分。True 返回日期时间，False 返回日期部分
+        return_std: 是否返回标准 datetime 对象（仅当 fmt 为 None 时有效）
+        
+    Returns:
+        - 如果 fmt 有值，返回格式化后的字符串
+        - 如果 fmt 为 None 且 return_std 为 False，返回 pendulum.DateTime 对象
+        - 如果 fmt 为 None 且 return_std 为 True，返回标准 datetime 对象
+        
+    Examples:
+        >>> # 获取昨日日期（不包含时间）
+        >>> yesterday()
+        <DateTime object>
+        
+        >>> # 获取自当前一个自然日前的日期时间
+        >>> yesterday(addtime=True)
+        <DateTime object>
+        
+        >>> # 获取标准 datetime 对象
+        >>> yesterday(return_std=True)
+        <datetime object>
+        
+        >>> # 获取格式化的昨日日期
+        >>> yesterday(fmt='YYYY-MM-DD')
+        '2024-01-14'
+    """
+    # 确定时区
+    if tz is None:
+        xtz = plm.local_timezone().name
+    else:
+        xtz = tz
+    
+    # 获取日期时间对象
+    res = plm.now(tz=xtz).subtract(days=1) if addtime else plm.yesterday(tz=xtz)
     
     # 如果需要格式化，直接返回格式化字符串
     if fmt:
