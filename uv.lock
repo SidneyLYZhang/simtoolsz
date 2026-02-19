@@ -214,13 +214,17 @@ wheels = [
 
 [[package]]
 name = "simtoolsz"
-version = "0.2.12"
+version = "0.2.12.3"
 source = { editable = "." }
 dependencies = [
     { name = "duckdb" },
     { name = "pendulum" },
     { name = "polars" },
     { name = "pyarrow" },
+]
+
+[package.dev-dependencies]
+dev = [
     { name = "pytest" },
 ]
 
@@ -230,8 +234,10 @@ requires-dist = [
     { name = "pendulum", specifier = ">=3.1.0" },
     { name = "polars", specifier = ">=1.33.1" },
     { name = "pyarrow", specifier = ">=22.0.0" },
-    { name = "pytest", specifier = ">=9.0.1" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=9.0.1" }]
 
 [[package]]
 name = "six"

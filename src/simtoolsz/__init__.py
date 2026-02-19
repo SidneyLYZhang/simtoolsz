@@ -1,3 +1,17 @@
+"""
+simtoolsz - 实用工具集
+
+提供数据处理、邮件操作、时间转换、国家代码转换等常用功能模块。
+
+模块说明:
+    - db: 数据库操作工具，支持将压缩包中的数据导入DuckDB
+    - mail: 邮件发送与接收工具
+    - utils: 通用工具函数
+    - datetime: 时间日期处理与转换
+    - reader: 数据文件读取工具
+    - countrycode: 国家代码转换器
+"""
+
 import importlib.metadata
 
 import simtoolsz.db as db
@@ -11,7 +25,7 @@ import simtoolsz.countrycode as countrycode
 try:
     __version__ = importlib.metadata.version("simtoolsz")
 except importlib.metadata.PackageNotFoundError:
-    __version__ = "0.2.12.3"
+    __version__ = "0.2.13"
 
 __all__ = [
     '__version__', 'mail', 'utils', 'datetime',

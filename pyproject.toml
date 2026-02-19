@@ -1,6 +1,6 @@
 [project]
 name = "simtoolsz"
-version = "0.2.12.3"
+version = "0.2.13"
 description = "A simple and convenient toolkit containing useful functions, classes, and methods."
 keywords = ["tool", "collection"]
 license = { text = "MulanPSL-2.0" }
@@ -12,7 +12,6 @@ dependencies = [
     "duckdb>=1.4.0",
     "polars>=1.33.1",
     "pyarrow>=22.0.0",
-    "pytest>=9.0.1",
 ]
 readme = "README.md"
 requires-python = ">= 3.11"
@@ -36,12 +35,22 @@ Issues = "https://github.com/SidneyLYZhang/simtoolsz/issues"
 requires = ["hatchling==1.26.3", "hatch-vcs"]
 build-backend = "hatchling.build"
 
-# [tool.rye]
-# managed = true
-# dev-dependencies = []
+[dependency-groups]
+dev = [
+    "pytest>=9.0.1",
+]
 
 [tool.hatch.metadata]
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/simtoolsz"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]

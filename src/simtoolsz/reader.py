@@ -1,3 +1,30 @@
+"""
+数据文件读取模块
+
+提供统一的数据文件读取接口，支持多种文件格式和压缩文件。
+
+主要功能:
+    - read_tsv/scan_tsv: 读取TSV文件
+    - getreader: 获取适合的文件读取器
+    - load_data: 统一的数据加载函数
+    - read_archive: 读取压缩包中的数据文件
+    - excel_sheet_names: 获取Excel文件的工作表名称
+    - load_excel: 加载Excel文件
+
+支持的文件格式:
+    - CSV: 逗号分隔值文件
+    - TSV: 制表符分隔值文件
+    - XLSX/XLS/ODS: Excel文件
+    - JSON: JSON数据文件
+    - Parquet: Apache Parquet格式
+    - IPC/Feather: Apache Arrow IPC格式
+    - Avro: Apache Avro格式
+
+支持的压缩格式:
+    - ZIP: ZIP压缩包
+    - TAR/TAR.GZ/TAR.BZ2: TAR压缩包
+"""
+
 import warnings
 import re
 import polars as pl
@@ -16,30 +43,36 @@ __all__ = [
     "is_archive_file", "excel_sheet_names", "load_excel"
 ]
 
+
 def read_tsv(filepath: Path, lazy: bool = False, **kwargs
-) -> pl.DataFrame|pl.LazyFrame:
-    """Read TSV file with optimized settings for polars.
-    
+             ) -> pl.DataFrame | pl.LazyFrame:
+    """
+    读取TSV文件（制表符分隔值文件）。
+
     Args:
-        filepath: Path to TSV file
-        lazy: Whether to read lazily (default: False)
-        **kwargs: Additional arguments passed to pl.read_csv
-        
+        filepath: TSV文件路径
+        lazy: 是否使用惰性读取模式（默认False）
+        **kwargs: 传递给polars读取函数的额外参数
+
     Returns:
-        pl.DataFrame: Loaded data frame
-        
+        pl.DataFrame | pl.LazyFrame: 加载的数据
+
     Raises:
-        FileNotFoundError: If file doesn't exist
-        ValueError: If file is empty or invalid
+        FileNotFoundError: 文件不存在
+        ValueError: 文件为空或无效
+
+    Examples:
+        >>> df = read_tsv("data.tsv")
+        >>> lazy_df = read_tsv("data.tsv", lazy=True)
     """
     filepath = Path(filepath)
-    
+
     if not filepath.exists():
         raise FileNotFoundError(f"TSV file not found: {filepath}")
-    
+
     if filepath.stat().st_size == 0:
         raise ValueError(f"TSV file is empty: {filepath}")
-    
+
     try:
         if lazy:
             return pl.scan_csv(
@@ -58,45 +91,47 @@ def read_tsv(filepath: Path, lazy: bool = False, **kwargs
     except Exception as e:
         raise ValueError(f"Failed to read TSV file {filepath}: {e}")
 
+
 def scan_tsv(filepath: Path, **kwargs) -> pl.LazyFrame:
-    """Scan TSV file with optimized settings for polars.
-    
+    """
+    惰性读取TSV文件。
+
     Args:
-        filepath: Path to TSV file
-        **kwargs: Additional arguments passed to pl.scan_csv
-        
+        filepath: TSV文件路径
+        **kwargs: 传递给polars.scan_csv的额外参数
+
     Returns:
-        pl.LazyFrame: Loaded lazy data frame
-        
-    Raises:
-        FileNotFoundError: If file doesn't exist
-        ValueError: If file is empty or invalid
+        pl.LazyFrame: 惰性数据帧
+
+    Examples:
+        >>> lazy_df = scan_tsv("data.tsv")
     """
     return read_tsv(filepath, lazy=True, **kwargs)
 
 
 def _validate_input(file_path: Path | str, format_type: Optional[str]) -> tuple[Path, str]:
-    """Validate and normalize input parameters.
-    
+    """
+    验证并规范化输入参数。
+
     Args:
-        file_path: Path to the file
-        format_type: Optional format override
-        
+        file_path: 文件路径
+        format_type: 可选的格式覆盖
+
     Returns:
-        tuple: (validated_path, format_string)
-        
+        tuple: (验证后的路径, 格式字符串)
+
     Raises:
-        TypeError: If file_path is invalid
-        ValueError: If format_type is invalid
+        TypeError: 文件路径无效
+        ValueError: 格式类型无效
     """
     if not file_path:
         raise TypeError("file_path cannot be empty")
-    
+
     try:
         validated_path = Path(file_path)
     except (TypeError, ValueError) as e:
         raise TypeError(f"Invalid file_path: {e}")
-    
+
     if format_type:
         fmt = format_type.lower().strip()
         if not fmt:
@@ -105,18 +140,19 @@ def _validate_input(file_path: Path | str, format_type: Optional[str]) -> tuple[
         if not validated_path.suffix:
             raise ValueError(f"Cannot determine format from file path: {validated_path}")
         fmt = validated_path.suffix.lower().lstrip('.')
-    
+
     return validated_path, fmt
 
 
 def _get_reader_mapping(lazy: bool) -> dict[str, Callable]:
-    """Get format-to-reader mapping based on lazy mode.
-    
+    """
+    获取格式到读取器的映射。
+
     Args:
-        lazy: Whether to use lazy readers
-        
+        lazy: 是否使用惰性读取器
+
     Returns:
-        dict: Format to reader function mapping
+        dict: 格式到读取函数的映射
     """
     if lazy:
         return {
@@ -125,7 +161,7 @@ def _get_reader_mapping(lazy: bool) -> dict[str, Callable]:
             'ipc': pl.scan_ipc,
             'tsv': scan_tsv
         }
-    
+
     return {
         'csv': pl.read_csv,
         'tsv': read_tsv,
@@ -140,16 +176,17 @@ def _get_reader_mapping(lazy: bool) -> dict[str, Callable]:
 
 
 def _handle_focus_mode(fmt: str) -> Callable:
-    """Handle focus mode with strict format checking.
-    
+    """
+    处理焦点模式，严格检查格式支持。
+
     Args:
-        fmt: Format string
-        
+        fmt: 格式字符串
+
     Returns:
-        Callable: Reader function
-        
+        Callable: 读取器函数
+
     Raises:
-        ValueError: If format is not supported
+        ValueError: 格式不支持
     """
     reader = getattr(pl, f"read_{fmt}", None)
     if reader is None:
@@ -160,13 +197,14 @@ def _handle_focus_mode(fmt: str) -> Callable:
 
 
 def _get_fallback_reader(lazy: bool) -> Callable:
-    """Get fallback reader for unsupported formats.
-    
+    """
+    获取不支持的格式的后备读取器。
+
     Args:
-        lazy: Whether to use lazy reader
-        
+        lazy: 是否使用惰性读取器
+
     Returns:
-        Callable: Fallback reader function
+        Callable: 后备读取器函数
     """
     return pl.scan_csv if lazy else pl.read_csv
 
@@ -178,40 +216,43 @@ def getreader(
     lazy: bool = False,
     focus: bool = False
 ) -> Callable:
-    """Get appropriate reader function based on file extension or specified format.
-    
-    Args:
-        file_path: Path to the file
-        format_type: Optional format override (e.g., 'csv', 'json', 'parquet')
-        in_batch: Whether to read in batch mode, only for csv file (default: False)
-        lazy: Whether to read lazily, only for csv, ipc, parquet file (default: False)
-        focus: Whether to focus on the specified format, if not supported, raise ValueError (default: False)
-        
-    Returns:
-        Callable: Polars reader function for the specified format
-        
-    Raises:
-        ValueError: If format is not supported and focus=True
-        TypeError: If file_path is invalid
     """
-    # Step 1: Validate input
+    根据文件扩展名或指定格式获取适当的读取器函数。
+
+    Args:
+        file_path: 文件路径
+        format_type: 可选的格式覆盖（如 'csv', 'json', 'parquet'）
+        in_batch: 是否批量读取模式，仅适用于CSV文件（默认False）
+        lazy: 是否惰性读取模式，仅适用于csv, ipc, parquet文件（默认False）
+        focus: 是否聚焦于指定格式，如果不支持则抛出异常（默认False）
+
+    Returns:
+        Callable: 指定格式的Polars读取器函数
+
+    Raises:
+        ValueError: 格式不支持且focus=True
+        TypeError: 文件路径无效
+
+    Examples:
+        >>> reader = getreader("data.csv")
+        >>> df = reader("data.csv")
+        
+        >>> reader = getreader("data.parquet", lazy=True)
+        >>> lazy_df = reader("data.parquet")
+    """
     _, fmt = _validate_input(file_path, format_type)
-    
-    # Step 2: Handle special cases
+
     if focus:
         return _handle_focus_mode(fmt)
-    
+
     if fmt == 'csv' and in_batch:
         return pl.read_csv_batched
-    
-    # Step 3: Get appropriate reader
+
     reader_mapping = _get_reader_mapping(lazy)
-    
-    # Step 4: Return reader or fallback
+
     if fmt in reader_mapping:
         return reader_mapping[fmt]
-    
-    # Fallback with warning
+
     supported = ', '.join(sorted(reader_mapping.keys()))
     warnings.warn(
         f"Unknown format '{fmt}', falling back to {'lazy' if lazy else 'eager'} CSV reader. "
@@ -224,13 +265,13 @@ def getreader(
 
 def _is_archive_file(file_path: Path) -> bool:
     """
-    Check if the file is an archive file.
-    
+    检查文件是否为压缩文件。
+
     Args:
-        file_path: Path to the file
-        
+        file_path: 文件路径
+
     Returns:
-        bool: True if the file is an archive file(zip or tar), False otherwise
+        bool: 如果是压缩文件返回True，否则返回False
     """
     if not file_path.is_file():
         return False
@@ -241,13 +282,13 @@ def _is_archive_file(file_path: Path) -> bool:
 
 def is_archive_file(file_path: Path) -> bool:
     """
-    Check if the file is an archive file or the file is in an archive file.
-    
+    检查文件是否为压缩文件或文件在压缩文件中。
+
     Args:
-        file_path: Path to the file
-        
+        file_path: 文件路径
+
     Returns:
-        bool: True if the file is an archive file(zip or tar), False otherwise
+        bool: 如果是压缩文件或在压缩文件中返回True
     """
     return _is_archive_file(file_path) or any(
         _is_archive_file(p) for p in file_path.parents
@@ -258,83 +299,105 @@ def read_archive(file_path: str | Path,
                  filename: Optional[str] = None,
                  format_type: Optional[str] = None,
                  **kwargs
-) -> pl.DataFrame :
+                 ) -> pl.DataFrame:
     """
-    Read data file inside a zip file or a tar file.
-    
-    The Path like : `path/to/compressed.zip/data.csv` or `path/to/compressed.tar.gz`
+    读取压缩包中的数据文件。
+
+    支持的路径格式:
+        - path/to/compressed.zip/data.csv
+        - path/to/compressed.tar.gz/data.csv
 
     Args:
-        file_path: Path to data file inside the zip file or tar file
-        filename: Optional filename to read from the zip file, if None, read the first file in the zip file
-        format_type: Optional format override (e.g., 'csv', 'json', 'parquet')
-        **kwargs: Additional arguments to pass to the reader function
-        
+        file_path: 压缩包中数据文件的路径
+        filename: 可选的文件名，如果为None则读取压缩包中的第一个文件
+        format_type: 可选的格式覆盖（如 'csv', 'json', 'parquet'）
+        **kwargs: 传递给读取函数的额外参数
+
     Returns:
-        pl.DataFrame: Loaded data
+        pl.DataFrame: 加载的数据
+
+    Examples:
+        >>> df = read_archive("data.zip/users.csv")
+        >>> df = read_archive("data.zip", filename="users.csv")
     """
     file_path = Path(file_path)
-    
-    # Step 1: Determine archive path and filename
+
     archive_path, target_filename = _resolve_archive_and_filename(file_path, filename)
-    
-    # Step 2: Get appropriate reader function
+
     focus = format_type is not None
     reader = getreader(target_filename, format_type=format_type, focus=focus)
-    
-    # Step 3: Read data from archive
+
     return _read_from_archive(archive_path, target_filename, reader, **kwargs)
 
 
 def _resolve_archive_and_filename(file_path: Path, filename: Optional[str]) -> tuple[Path, str]:
     """
-    Resolve archive path and target filename from the given file path.
-    
+    从文件路径解析压缩包路径和目标文件名。
+
     Args:
-        file_path: Path to data file inside archive
-        filename: Optional filename override
-        
+        file_path: 压缩包中数据文件的路径
+        filename: 可选的文件名覆盖
+
     Returns:
-        tuple: (archive_path, target_filename)
-        
+        tuple: (压缩包路径, 目标文件名)
+
     Raises:
-        ValueError: If file_path is not inside an archive file
+        ValueError: 文件路径不在压缩包中
     """
     if filename is not None:
-        # If filename is provided, archive_path is the parent directory
         archive_path = file_path.parent
         if not _is_archive_file(archive_path):
             raise ValueError(f"Parent directory is not an archive file: {archive_path}")
         return archive_path, filename
-    
-    # Case 1: Parent directory is an archive
+
     if _is_archive_file(file_path.parent):
         return file_path.parent, file_path.name
-    
-    # Case 2: File itself is an archive
+
     if _is_archive_file(file_path):
         return file_path, _get_archive_filename(file_path)
-    
-    # Case 3: Archive is in parent directories
+
     for parent in file_path.parents:
         if _is_archive_file(parent):
             return parent, file_path.name
-    
+
     raise ValueError("file_path must be a file inside an archive file (zip or tar)")
+
+
+def _get_archive_filename(archive_path: Path) -> str:
+    """
+    获取压缩包中的第一个数据文件名。
+
+    Args:
+        archive_path: 压缩包路径
+
+    Returns:
+        str: 第一个数据文件的文件名
+    """
+    if is_zipfile(archive_path):
+        with ZipFile(archive_path, 'r') as zf:
+            for name in zf.namelist():
+                if not name.endswith('/'):
+                    return name
+    elif is_tarfile(archive_path):
+        with TarFile(archive_path, 'r:*') as tf:
+            for member in tf.getmembers():
+                if member.isfile():
+                    return member.name
+    raise ValueError(f"Cannot determine filename from archive: {archive_path}")
 
 
 def _read_from_archive(archive_path: Path, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
     """
-    Read data from archive file using the specified reader function.
-    
+    使用指定的读取器从压缩包中读取数据。
+
     Args:
-        archive_path: Path to archive file
-        filename: Name of file to read inside archive
-        reader: Reader function to use
-        **kwargs: Additional arguments for reader
-        
+        archive_path: 压缩包路径
+        filename: 压缩包内的文件名
+        reader: 读取器函数
+        **kwargs: 传递给读取器的额外参数
+
     Returns:
-        pl.DataFrame: Loaded data
+        pl.DataFrame: 加载的数据
     """
     if is_zipfile(archive_path):
         return _read_from_zip(archive_path, filename, reader, **kwargs)
@@ -346,62 +409,58 @@ def _read_from_archive(archive_path: Path, filename: str, reader: Callable, **kw
 
 def _read_from_zip(archive_path: Path, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
     """
-    Read data from zip archive.
-    
+    从ZIP压缩包中读取数据。
+
     Args:
-        archive_path: Path to zip file
-        filename: Name of file to read inside zip
-        reader: Reader function to use
-        **kwargs: Additional arguments for reader
-        
+        archive_path: ZIP文件路径
+        filename: ZIP内的文件名
+        reader: 读取器函数
+        **kwargs: 传递给读取器的额外参数
+
     Returns:
-        pl.DataFrame: Loaded data
+        pl.DataFrame: 加载的数据
     """
     with ZipFile(archive_path, 'r') as zf:
         try:
-            # Try to read directly from archive
             with zf.open(filename) as f:
                 return reader(f, **kwargs)
         except Exception:
-            # Fallback: extract to temporary directory
             return _extract_and_read_zip(zf, filename, reader, **kwargs)
 
 
 def _read_from_tar(archive_path: Path, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
     """
-    Read data from tar archive.
-    
+    从TAR压缩包中读取数据。
+
     Args:
-        archive_path: Path to tar file
-        filename: Name of file to read inside tar
-        reader: Reader function to use
-        **kwargs: Additional arguments for reader
-        
+        archive_path: TAR文件路径
+        filename: TAR内的文件名
+        reader: 读取器函数
+        **kwargs: 传递给读取器的额外参数
+
     Returns:
-        pl.DataFrame: Loaded data
+        pl.DataFrame: 加载的数据
     """
     with TarFile(archive_path, 'r:*') as tf:
         try:
-            # Try to read directly from archive
             with tf.extractfile(filename) as f:
                 return reader(f, **kwargs)
         except Exception:
-            # Fallback: extract to temporary directory
             return _extract_and_read_tar(tf, filename, reader, **kwargs)
 
 
 def _extract_and_read_zip(zf: ZipFile, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
     """
-    Extract file from zip and read it.
-    
+    从ZIP中提取文件并读取。
+
     Args:
-        zf: ZipFile object
-        filename: Name of file to extract and read
-        reader: Reader function to use
-        **kwargs: Additional arguments for reader
-        
+        zf: ZipFile对象
+        filename: 要提取和读取的文件名
+        reader: 读取器函数
+        **kwargs: 传递给读取器的额外参数
+
     Returns:
-        pl.DataFrame: Loaded data
+        pl.DataFrame: 加载的数据
     """
     with TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir) / filename
@@ -411,21 +470,21 @@ def _extract_and_read_zip(zf: ZipFile, filename: str, reader: Callable, **kwargs
 
 def _extract_and_read_tar(tf: TarFile, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
     """
-    Extract file from tar and read it.
-    
+    从TAR中提取文件并读取。
+
     Args:
-        tf: TarFile object
-        filename: Name of file to extract and read
-        reader: Reader function to use
-        **kwargs: Additional arguments for reader
-        
+        tf: TarFile对象
+        filename: 要提取和读取的文件名
+        reader: 读取器函数
+        **kwargs: 传递给读取器的额外参数
+
     Returns:
-        pl.DataFrame: Loaded data
+        pl.DataFrame: 加载的数据
     """
+    import tarfile
     with TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir) / filename
-        
-        # Use safe extraction if available
+
         if hasattr(tarfile, 'data_filter'):
             tf.extract(filename, tmpdir, filter='data')
         else:
@@ -435,9 +494,8 @@ def _extract_and_read_tar(tf: TarFile, filename: str, reader: Callable, **kwargs
                 stacklevel=2
             )
             tf.extract(filename, tmpdir)
-        
-        return reader(tmp_path, **kwargs)
 
+        return reader(tmp_path, **kwargs)
 
 
 def load_data(
@@ -446,25 +504,31 @@ def load_data(
     in_batch: bool = False,
     lazy: bool = False,
     focus: bool = False,
-    transtype: pl.Expr|list[pl.Expr]|None = None,
+    transtype: pl.Expr | list[pl.Expr] | None = None,
     **kwargs
 ) -> pl.DataFrame | pl.LazyFrame | BatchedCsvReader:
     """
-    Load data from a file using the appropriate reader.
+    统一的数据加载函数。
+
+    自动识别文件格式并使用适当的读取器加载数据，支持压缩文件和类型转换。
 
     Args:
-        file_path: Path to the file
-        format_type: Optional format override (e.g., 'csv', 'json', 'parquet')
-        in_batch: Whether to read in batch mode, only for csv file (default: False)
-        lazy: Whether to read lazily, only for csv, ipc, parquet file (default: False)
-        focus: Whether to focus on the specified format, if not supported, raise ValueError (default: False)
-        transtype: Optional type transformation expression(s) to apply to the data
-        **kwargs: Additional arguments to pass to the reader function
-        
+        file_path: 文件路径
+        format_type: 可选的格式覆盖（如 'csv', 'json', 'parquet'）
+        in_batch: 是否批量读取模式，仅适用于CSV文件（默认False）
+        lazy: 是否惰性读取模式，仅适用于csv, ipc, parquet文件（默认False）
+        focus: 是否聚焦于指定格式，如果不支持则抛出异常（默认False）
+        transtype: 可选的类型转换表达式或表达式列表
+        **kwargs: 传递给读取函数的额外参数
+
     Returns:
-        pl.DataFrame | pl.LazyFrame | pl.BatchedCsvReader: Loaded data
+        pl.DataFrame | pl.LazyFrame | BatchedCsvReader: 加载的数据
+
+    Examples:
+        >>> df = load_data("data.csv")
+        >>> lazy_df = load_data("data.parquet", lazy=True)
+        >>> df = load_data("data.zip/users.csv")
     """
-    # Step 1 : load data
     if is_archive_file(file_path):
         df = read_archive(file_path, format_type=format_type, **kwargs)
     else:
@@ -476,8 +540,7 @@ def load_data(
             focus=focus
         )
         df = reader(file_path, **kwargs)
-    
-    # Step 2 : apply type transformation
+
     if transtype is not None:
         if isinstance(transtype, pl.Expr):
             df = df.with_columns(transtype)
@@ -485,34 +548,41 @@ def load_data(
             df = df.with_columns(*transtype)
     return df
 
+
 def excel_sheet_names(
     file_path: Path | str
 ) -> list[str]:
     """
-    Get the names of all sheets in an Excel file.
+    获取Excel文件中所有工作表的名称。
 
     Args:
-        file_path: Path to the Excel file
-        
+        file_path: Excel文件路径
+
     Returns:
-        list[str]: Names of all sheets in the Excel file
+        list[str]: 所有工作表名称的列表
+
+    Examples:
+        >>> names = excel_sheet_names("data.xlsx")
+        >>> print(names)
+        ['Sheet1', 'Sheet2', 'Sheet3']
     """
     with ZipFile(file_path, 'r') as zf:
         xml_content = zf.read("xl/workbook.xml").decode('utf-8')
         sheet_names = re.findall(r'<sheet name="([^"]+)"', xml_content)
     return sheet_names
 
+
 def _get_excel_samecolumns_sheet(
     file_path: Path | str
-) -> list[list[str]] :
+) -> list[list[str]]:
     """
-    Get the names of all sheets in an Excel file that have the same columns.
+    获取具有相同列的Excel工作表分组。
 
     Args:
-        file_path: Path to the Excel file
-        
+        file_path: Excel文件路径
+
     Returns:
-        list[list[str]]: Names of all sheets in the Excel file that have the same columns.
+        list[list[str]]: 具有相同列的工作表名称分组
     """
     sheet_names = excel_sheet_names(file_path)
     if len(sheet_names) == 0:
@@ -536,28 +606,38 @@ def load_excel(
     **kwargs
 ) -> pl.DataFrame:
     """
-    Load data from an Excel file.
+    加载Excel文件数据。
 
     Args:
-        file_path: Path to the Excel file
-        sheet_name: Name of the sheet to load (default: "Sheet1"), 
-                    special value "@all" load all sheets,"@most" load sheets with most columns
-        **kwargs: Additional arguments to pass to polars.read_excel
-        
+        file_path: Excel文件路径
+        sheet_name: 工作表名称（默认"Sheet1"）
+            特殊值:
+            - "@all": 加载所有工作表（要求所有工作表列相同）
+            - "@most": 加载列数最多的工作表组
+        **kwargs: 传递给polars.read_excel的额外参数
+
     Returns:
-        pl.DataFrame: Loaded data
+        pl.DataFrame: 加载的数据
+
+    Raises:
+        ValueError: 工作表不存在或工作表列不同
+
+    Examples:
+        >>> df = load_excel("data.xlsx")
+        >>> df = load_excel("data.xlsx", sheet_name="Sheet2")
+        >>> df = load_excel("data.xlsx", sheet_name="@all")
     """
     sheet_names = excel_sheet_names(file_path)
     sheet_parts = _get_excel_samecolumns_sheet(file_path)
-    if sheet_name.lower() == "@all" :
-        if len(sheet_parts) != 1 :
+    if sheet_name.lower() == "@all":
+        if len(sheet_parts) != 1:
             raise ValueError("Excel file has multiple sheets with different columns")
         df = pl.concat([
             pl.read_excel(file_path, sheet_name=sn, **kwargs)
             for sn in sheet_names
         ])
         return df
-    elif sheet_name.lower() == "@most" :
+    elif sheet_name.lower() == "@most":
         sheet_name = []
         for i in sheet_parts:
             if len(i) > len(sheet_name):

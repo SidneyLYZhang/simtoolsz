@@ -1,3 +1,24 @@
+"""
+邮件操作模块
+
+提供邮件发送和接收功能，支持附件、HTML格式、内嵌图片等高级功能。
+
+主要功能:
+    - send_email: 发送邮件（支持附件、HTML、内嵌图片）
+    - fetch_emails: 获取邮件（支持按主题、发件人搜索）
+    - encode_utf7/decode_utf7: UTF-7编码/解码（用于IMAP邮箱名称）
+    - quicksendemail/quickemail: send_email的别名（兼容旧版本）
+    - load_email_by_subject: fetch_emails的别名（兼容旧版本）
+
+支持的邮箱服务商:
+    - QQ邮箱 (smtp.qq.com)
+    - 163邮箱 (smtp.163.com)
+    - 126邮箱 (smtp.126.com)
+    - Gmail (smtp.gmail.com)
+    - Outlook/Hotmail (smtp-mail.outlook.com)
+    - 企业邮箱 (smtp.exmail.qq.com)
+"""
+
 import imaplib
 import email
 import os
@@ -19,10 +40,11 @@ from simtoolsz.utils import take_from_list
 
 
 __all__ = [
-    "send_email", "fetch_emails", 
+    "send_email", "fetch_emails",
     "quicksendemail", "quickemail", "load_email_by_subject",
     "encode_utf7", "decode_utf7"
 ]
+
 
 def send_email(
     email_account: str,
@@ -41,49 +63,14 @@ def send_email(
     timeout: int = 30
 ) -> Dict[str, Any]:
     """
-    简单易用的邮件发送函数（支持附件、HTML、内嵌图片等高级功能）
-    
-    使用示例:
-        # 基础用法 - 发送纯文本邮件
-        result = send_email(
-            email_account="your@qq.com",
-            password="your_password",
-            subject="测试邮件",
-            content="这是一封测试邮件",
-            recipients="friend@example.com"
-        )
-        
-        # 高级用法 - 发送HTML邮件带附件
-        result = send_email(
-            email_account="your@gmail.com",
-            password="app_password",
-            subject="项目报告",
-            content="<h1>本月工作报告</h1><p>详见附件</p>",
-            recipients=["boss@company.com", "同事<colleague@company.com>"],
-            cc_recipients=["assistant@company.com"],
-            attachments=["report.pdf", "data.xlsx"],
-            html_mode=True,
-            sender_name="张三",
-            signature="<br><em>此致<br>张三</em>"
-        )
-        
-        # 使用内嵌图片
-        result = send_email(
-            email_account="your@163.com",
-            password="auth_code",
-            subject="产品展示",
-            content='<img src="cid:product1"><p>最新产品图片</p>',
-            recipients="client@example.com",
-            inline_images={"product1": "product.jpg"},
-            html_mode=True
-        )
+    发送邮件，支持附件、HTML格式、内嵌图片等高级功能。
 
     Args:
         email_account: 发件人邮箱地址
         password: 邮箱密码或授权码（QQ/163等需要授权码）
         subject: 邮件主题
         content: 邮件正文内容（支持HTML或纯文本）
-        recipients: 收件人，可以是：
+        recipients: 收件人，可以是:
             - 单个邮箱字符串: "user@example.com"
             - 邮箱列表: ["user1@example.com", "user2@example.com"]
             - 带名称的格式: ["张三<user@example.com>"] 或 [("张三", "user@example.com")]
@@ -109,16 +96,49 @@ def send_email(
     Raises:
         ValueError: 参数验证失败
         RuntimeError: 邮件发送失败
+
+    Examples:
+        >>> # 基础用法 - 发送纯文本邮件
+        >>> result = send_email(
+        ...     email_account="your@qq.com",
+        ...     password="your_password",
+        ...     subject="测试邮件",
+        ...     content="这是一封测试邮件",
+        ...     recipients="friend@example.com"
+        ... )
+        
+        >>> # 高级用法 - 发送HTML邮件带附件
+        >>> result = send_email(
+        ...     email_account="your@gmail.com",
+        ...     password="app_password",
+        ...     subject="项目报告",
+        ...     content="<h1>本月工作报告</h1><p>详见附件</p>",
+        ...     recipients=["boss@company.com", "同事<colleague@company.com>"],
+        ...     cc_recipients=["assistant@company.com"],
+        ...     attachments=["report.pdf", "data.xlsx"],
+        ...     html_mode=True,
+        ...     sender_name="张三",
+        ...     signature="<br><em>此致<br>张三</em>"
+        ... )
+        
+        >>> # 使用内嵌图片
+        >>> result = send_email(
+        ...     email_account="your@163.com",
+        ...     password="auth_code",
+        ...     subject="产品展示",
+        ...     content='<img src="cid:product1"><p>最新产品图片</p>',
+        ...     recipients="client@example.com",
+        ...     inline_images={"product1": "product.jpg"},
+        ...     html_mode=True
+        ... )
     """
-    # 参数验证和预处理
     if not recipients:
         raise ValueError("必须指定至少一个收件人")
-    
-    # 标准化参数格式
+
     attachments = attachments or []
     cc_recipients = cc_recipients or []
     bcc_recipients = bcc_recipients or []
-    
+
     def parse_recipients(recipients):
         """解析收件人参数为标准化格式"""
         if isinstance(recipients, str):
@@ -126,23 +146,20 @@ def send_email(
         elif isinstance(recipients, (list, tuple)):
             return list(recipients)
         return []
-    
+
     all_recipients = parse_recipients(recipients)
     all_cc = parse_recipients(cc_recipients)
     all_bcc = parse_recipients(bcc_recipients)
-    
-    # 创建邮件对象
+
     msg = MIMEMultipart()
     msg.set_charset("utf-8")
-    
-    # 设置发件人
+
     if sender_name:
-        # 使用Header处理非ASCII字符，然后手动格式化地址
         encoded_name = Header(sender_name, "utf-8").encode()
         msg["From"] = f"{encoded_name} <{email_account}>"
     else:
         msg["From"] = email_account
-    
+
     def format_recipient_list(recipient_list):
         """格式化收件人列表"""
         formatted = []
@@ -150,19 +167,16 @@ def send_email(
             if isinstance(recipient, tuple) and len(recipient) == 2:
                 name, addr = recipient
                 if name:
-                    # 使用Header处理非ASCII字符，然后手动格式化地址
                     encoded_name = Header(name, "utf-8").encode()
                     formatted.append(f"{encoded_name} <{addr}>")
                 else:
                     formatted.append(addr)
             else:
-                # 处理字符串格式如 "张三<user@example.com>"
                 recipient_str = str(recipient)
                 if "<" in recipient_str and ">" in recipient_str:
                     name_part = recipient_str.split("<")[0].strip()
                     addr_part = recipient_str.split("<")[1].split(">")[0].strip()
                     if name_part:
-                        # 使用Header处理非ASCII字符，然后手动格式化地址
                         encoded_name = Header(name_part, "utf-8").encode()
                         formatted.append(f"{encoded_name} <{addr_part}>")
                     else:
@@ -170,78 +184,69 @@ def send_email(
                 else:
                     formatted.append(recipient_str)
         return formatted
-    
-    # 设置收件人
+
     msg["Subject"] = Header(subject, "utf-8")
-    
-    # 处理收件人，确保正确编码
+
     if all_recipients:
         formatted_recipients = format_recipient_list(all_recipients)
         msg["To"] = ", ".join(formatted_recipients)
-    
+
     if all_cc:
         formatted_cc = format_recipient_list(all_cc)
         msg["Cc"] = ", ".join(formatted_cc)
-    
-    # 处理邮件正文和签名
+
     full_content = content
     if signature:
         if html_mode:
             full_content += f"<br><br>{signature}"
         else:
             full_content += f"\n\n{signature}"
-    
-    # 添加邮件正文
+
     if html_mode:
         msg.attach(MIMEText(full_content, "html", "utf-8"))
     else:
         msg.attach(MIMEText(full_content, "plain", "utf-8"))
-    
-    # 添加内嵌图片
+
     if inline_images:
         mimetypes.init()
         for cid, img_path in inline_images.items():
             img_path = Path(img_path)
             if not img_path.exists():
                 raise FileNotFoundError(f"内嵌图片文件不存在: {img_path}")
-            
+
             mime_type, _ = mimetypes.guess_type(img_path.name)
             if not mime_type or not mime_type.startswith("image/"):
                 raise ValueError(f"文件类型不支持或不是图片: {img_path}")
-            
+
             try:
                 with open(img_path, "rb") as img_file:
                     img_data = img_file.read()
-                
+
                 _, subtype = mime_type.split("/", 1)
                 img_part = MIMEImage(img_data, _subtype=subtype)
                 img_part.add_header("Content-ID", f"<{cid}>")
-                # 正确处理内嵌图片文件名编码
                 encoded_filename = Header(img_path.name, "utf-8").encode()
                 img_part.add_header("Content-Disposition", "inline", filename=encoded_filename)
                 msg.attach(img_part)
             except Exception as e:
                 raise RuntimeError(f"处理内嵌图片失败 {img_path}: {e}")
-    
-    # 添加附件
+
     for attachment in attachments:
         file_path = Path(attachment)
         if not file_path.exists():
             raise FileNotFoundError(f"附件文件不存在: {file_path}")
-        
+
         try:
             with open(file_path, "rb") as f:
                 file_data = f.read()
-            
-            # 正确处理附件文件名编码
+
             encoded_filename = Header(file_path.name, "utf-8").encode()
             part = MIMEApplication(file_data, Name=encoded_filename)
             part.add_header("Content-Disposition", "attachment", filename=encoded_filename)
             msg.attach(part)
         except Exception as e:
             raise RuntimeError(f"处理附件失败 {file_path}: {e}")
-    
-    # 自动配置SMTP服务器
+
     domain = email_account.split("@")[-1].lower()
     default_smtp_config = {
         "gmail.com": {"smtp_server": "smtp.gmail.com", "port": 587, "use_ssl": False},
@@ -252,8 +257,7 @@ def send_email(
         "hotmail.com": {"smtp_server": "smtp-mail.outlook.com", "port": 587, "use_ssl": False},
         "chinaott.net": {"smtp_server": "smtp.exmail.qq.com", "port": 465, "use_ssl": True},
     }
-    
-    # 使用自定义配置或自动配置
+
     if smtp_config:
         smtp_server = smtp_config.get("smtp_server")
         port = smtp_config.get("port", 587)
@@ -265,8 +269,7 @@ def send_email(
         smtp_server = config["smtp_server"]
         port = config["port"]
         use_ssl = config["use_ssl"]
-    
-    # 收集所有收件人
+
     def extract_emails(recipient_list):
         """提取邮箱地址"""
         emails = []
@@ -281,30 +284,28 @@ def send_email(
                 else:
                     emails.append(recipient_str)
         return emails
-    
+
     all_emails = extract_emails(all_recipients) + extract_emails(all_cc) + extract_emails(all_bcc)
-    
+
     try:
-        # 建立SMTP连接
         if use_ssl:
             server = smtplib.SMTP_SSL(smtp_server, port, timeout=timeout)
         else:
             server = smtplib.SMTP(smtp_server, port, timeout=timeout)
             server.starttls()
-        
-        # 登录并发送
+
         server.local_hostname = 'Localhost'
         server.login(email_account, password)
         server.sendmail(email_account, all_emails, msg.as_string())
         server.quit()
-        
+
         return {
             "success": True,
             "message": f"邮件发送成功，共发送给{len(all_emails)}个收件人",
             "recipient_count": len(all_emails),
             "smtp_server": smtp_server
         }
-        
+
     except Exception as e:
         return {
             "success": False,
@@ -313,25 +314,14 @@ def send_email(
             "smtp_server": smtp_server
         }
 
-def encode_utf7(text: str, type: Literal['imap','normal'] = 'imap') -> str :
+
+def encode_utf7(text: str, type: Literal['imap', 'normal'] = 'imap') -> str:
     """
     将文本编码为UTF-7格式，主要用于IMAP协议中的邮箱名称编码。
-    
+
     UTF-7编码是一种将Unicode文本编码为7位ASCII字符的编码方式，
     特别适用于IMAP协议中的邮箱名称（folder name）编码，因为IMAP协议
     要求邮箱名称必须是7位ASCII字符。
-    
-    使用示例:
-        # 编码中文邮箱名称
-        folder_name = "收件箱"
-        encoded = encode_utf7(folder_name)  # 返回IMAP格式的UTF-7编码
-        
-        # 使用标准UTF-7编码
-        standard_encoded = encode_utf7(folder_name, type='normal')
-        
-        # 编码包含特殊字符的邮箱名称
-        special_folder = "测试&文件夹"
-        encoded = encode_utf7(special_folder)
 
     Args:
         text: 需要编码的Unicode文本
@@ -341,37 +331,27 @@ def encode_utf7(text: str, type: Literal['imap','normal'] = 'imap') -> str :
 
     Returns:
         str: UTF-7编码后的字符串
+
+    Examples:
+        >>> # 编码中文邮箱名称
+        >>> folder_name = "收件箱"
+        >>> encoded = encode_utf7(folder_name)
         
-    注意:
-        - IMAP格式会将标准UTF-7中的'+'替换为'&'
-        - 纯ASCII字符不会被编码，保持原样
-        - 非ASCII字符会被编码为UTF-7格式
+        >>> # 使用标准UTF-7编码
+        >>> standard_encoded = encode_utf7(folder_name, type='normal')
     """
     res = text.encode("utf-7").decode("utf-8")
     if type == 'imap':
         res = res.replace("+", "&")
     return res
 
-def decode_utf7(text: str, type: Literal['imap','normal'] = 'imap') -> str:
+
+def decode_utf7(text: str, type: Literal['imap', 'normal'] = 'imap') -> str:
     """
     将UTF-7编码的文本解码为Unicode格式，主要用于IMAP协议中的邮箱名称解码。
-    
+
     这是encode_utf7的逆操作，用于将IMAP协议中的UTF-7编码邮箱名称
     解码回原始的Unicode文本。
-    
-    使用示例:
-        # 解码IMAP格式的UTF-7编码
-        encoded_folder = "&UXZO1mWHTvZZOg-"  # "收件箱"的UTF-7编码
-        decoded = decode_utf7(encoded_folder)  # 返回"收件箱"
-        
-        # 解码标准UTF-7格式
-        standard_encoded = "+UXZO1mWHTvZZOg-"
-        decoded = decode_utf7(standard_encoded, type='normal')
-        
-        # 解码混合编码的邮箱路径
-        mixed_path = "INBOX/&UXZO1mWHTvZZOg-/测试"
-        parts = mixed_path.split('/')
-        decoded_parts = [decode_utf7(part) for part in parts]
 
     Args:
         text: UTF-7编码的字符串
@@ -381,15 +361,19 @@ def decode_utf7(text: str, type: Literal['imap','normal'] = 'imap') -> str:
 
     Returns:
         str: 解码后的Unicode文本
-        
-    注意:
-        - IMAP格式会将'&'还原为标准的'+'再进行解码
-        - 纯ASCII字符保持不变
-        - 无效的UTF-7编码可能导致解码错误
+
+    Examples:
+        >>> # 解码IMAP格式的UTF-7编码
+        >>> encoded_folder = "&UXZO1mWHTvZZOg-"
+        >>> decoded = decode_utf7(encoded_folder)
+        '收件箱'
     """
     if type == 'imap':
         res = text.replace("&", "+")
+    else:
+        res = text
     return res.encode("utf-8").decode("utf-7")
+
 
 def fetch_emails(
     email_account: str,
@@ -402,43 +386,10 @@ def fetch_emails(
     attachment_dir: str = 'attachments',
     max_emails: Optional[int] = None,
     imap_config: Optional[Dict[str, Any]] = None,
-    search_mode: Literal['exact','fuzzy','regex'] = 'exact'
+    search_mode: Literal['exact', 'fuzzy', 'regex'] = 'exact'
 ) -> Dict[str, Any]:
     """
-    简单易用的邮件获取函数（支持按主题、发件人搜索，附件下载等）
-    
-    使用示例:
-        # 基础用法 - 获取所有邮件
-        result = fetch_emails(
-            email_account="your@qq.com",
-            password="your_password",
-            max_emails=10
-        )
-        
-        # 按主题搜索邮件
-        result = fetch_emails(
-            email_account="your@gmail.com",
-            password="app_password",
-            subject="项目报告",
-            search_mode="fuzzy",
-            date_range=(datetime(2024, 1, 1), datetime(2024, 12, 31))
-        )
-        
-        # 下载附件
-        result = fetch_emails(
-            email_account="your@163.com",
-            password="auth_code",
-            sender="boss@company.com",
-            download_attachments=True,
-            attachment_dir="./downloads"
-        )
-        
-        # 使用自定义IMAP配置
-        result = fetch_emails(
-            email_account="user@company.com",
-            password="password",
-            imap_config={"server": "imap.company.com", "port": 993, "use_ssl": True}
-        )
+    获取邮件，支持按主题、发件人搜索，附件下载等功能。
 
     Args:
         email_account: 邮箱账号
@@ -460,9 +411,9 @@ def fetch_emails(
                 "message": str,            # 结果消息
                 "email_count": int,        # 获取的邮件数量
                 "emails": List[Dict],      # 邮件列表
-                "attachments_dir": str   # 附件保存目录
+                "attachments_dir": str     # 附件保存目录
             }
-        
+
         邮件格式:
         {
             "subject": str,              # 邮件主题
@@ -474,19 +425,42 @@ def fetch_emails(
             "attachments": List[Dict],   # 附件列表
             "size": int                  # 邮件大小(字节)
         }
+
+    Examples:
+        >>> # 基础用法 - 获取所有邮件
+        >>> result = fetch_emails(
+        ...     email_account="your@qq.com",
+        ...     password="your_password",
+        ...     max_emails=10
+        ... )
+        
+        >>> # 按主题搜索邮件
+        >>> result = fetch_emails(
+        ...     email_account="your@gmail.com",
+        ...     password="app_password",
+        ...     subject="项目报告",
+        ...     search_mode="fuzzy",
+        ...     date_range=(datetime(2024, 1, 1), datetime(2024, 12, 31))
+        ... )
+        
+        >>> # 下载附件
+        >>> result = fetch_emails(
+        ...     email_account="your@163.com",
+        ...     password="auth_code",
+        ...     sender="boss@company.com",
+        ...     download_attachments=True,
+        ...     attachment_dir="./downloads"
+        ... )
     """
     try:
-        # 设置默认日期范围
         if date_range is None:
             end_date = datetime.now()
             start_date = end_date - timedelta(days=7)
             date_range = (start_date, end_date)
-        
-        # 创建附件目录
+
         if download_attachments:
             os.makedirs(attachment_dir, exist_ok=True)
-        
-        # 自动配置IMAP服务器
+
         domain = email_account.split("@")[-1].lower()
         default_imap_config = {
             "qq.com": {"server": "imap.qq.com", "port": 993, "use_ssl": True},
@@ -498,8 +472,7 @@ def fetch_emails(
             "aliyun.com": {"server": "imap.aliyun.com", "port": 993, "use_ssl": True},
             "chinaott.net": {"server": "imap.exmail.qq.com", "port": 993, "use_ssl": True},
         }
-        
-        # 使用自定义配置或自动配置
+
         if imap_config:
             imap_server = imap_config.get("server")
             port = imap_config.get("port", 993)
@@ -511,13 +484,12 @@ def fetch_emails(
             imap_server = config["server"]
             port = config["port"]
             use_ssl = config["use_ssl"]
-        
-        # 连接IMAP服务器
+
         if use_ssl:
             mail = imaplib.IMAP4_SSL(imap_server, port)
         else:
             mail = imaplib.IMAP4(imap_server, port)
-        
+
         try:
             mail.login(email_account, password)
 
@@ -531,41 +503,33 @@ def fetch_emails(
                     "emails": [],
                     "attachments_dir": attachment_dir if download_attachments else None
                 }
-            else :
+            else:
                 mailbox = selected_mailbox.split('"')[-2]
 
-            # 选择邮箱文件夹
             try:
                 mail.select(mailbox)
             except:
-                # 如果指定文件夹不存在，使用INBOX
                 mail.select('INBOX')
-            
-            # 构建搜索条件
+
             search_criteria = []
-            
-            # 日期范围
+
             if date_range:
                 start_str = date_range[0].strftime("%d-%b-%Y")
                 end_str = date_range[1].strftime("%d-%b-%Y")
                 search_criteria.append(f'(SINCE "{start_str}" BEFORE "{end_str}")')
-            
-            # 主题搜索
+
             if subject:
                 subject7 = encode_utf7(subject)
                 search_criteria.append(f'(SUBJECT "{subject7}")')
-            
-            # 发件人搜索
+
             if sender:
                 search_criteria.append(f'(FROM "{sender}")')
-            
-            # 组合搜索条件
+
             if len(search_criteria) > 1:
                 search_query = ' '.join(search_criteria)
             else:
                 search_query = search_criteria[0] if search_criteria else 'ALL'
-            
-            # 搜索邮件
+
             status, messages = mail.search(None, search_query)
             if status != 'OK' or not messages[0]:
                 return {
@@ -575,21 +539,20 @@ def fetch_emails(
                     "emails": [],
                     "attachments_dir": attachment_dir if download_attachments else None
                 }
-            
+
             mail_ids = messages[0].split()
             if max_emails:
-                mail_ids = mail_ids[-max_emails:]  # 获取最新的邮件
-            
+                mail_ids = mail_ids[-max_emails:]
+
             emails = []
-            for mail_id in reversed(mail_ids):  # 从新到旧排序
+            for mail_id in reversed(mail_ids):
                 try:
                     status, data = mail.fetch(mail_id, '(RFC822)')
                     if status != 'OK':
                         continue
-                    
+
                     msg = email.message_from_bytes(data[0][1])
-                    
-                    # 解码邮件主题
+
                     subject_header = decode_header(msg.get('Subject', ''))
                     subject_str = ""
                     for part, encoding in subject_header:
@@ -600,8 +563,7 @@ def fetch_emails(
                                 subject_str += part.decode('gbk', errors='replace')
                         else:
                             subject_str += str(part)
-                    
-                    # 检查主题匹配（对于正则模式进行二次过滤）
+
                     if subject and search_mode == 'regex':
                         import re
                         if not re.search(subject, subject_str, re.IGNORECASE):
@@ -610,28 +572,25 @@ def fetch_emails(
                         if subject.lower() not in subject_str.lower():
                             continue
                     elif subject and search_mode == 'exact':
-                        if subject != subject_str :
+                        if subject != subject_str:
                             continue
-                    
-                    # 提取正文内容
+
                     text_body = ""
                     html_body = ""
                     attachments_list = []
                     total_size = 0
-                    
+
                     if msg.is_multipart():
                         for part in msg.walk():
                             content_type = part.get_content_type()
                             content_disposition = str(part.get("Content-Disposition"))
-                            
-                            # 获取邮件大小
+
                             if part.get('Content-Length'):
                                 try:
                                     total_size += int(part.get('Content-Length'))
                                 except:
                                     pass
-                            
-                            # 处理正文
+
                             if "attachment" not in content_disposition:
                                 try:
                                     if content_type == "text/plain":
@@ -644,18 +603,17 @@ def fetch_emails(
                                         )
                                 except:
                                     pass
-                            
-                            # 处理附件
+
                             elif download_attachments and part.get_filename():
                                 try:
                                     filename = decode_header(part.get_filename())[0][0]
                                     if isinstance(filename, bytes):
                                         filename = filename.decode('utf-8', errors='replace')
-                                    
+
                                     filepath = os.path.join(attachment_dir, filename)
                                     with open(filepath, 'wb') as f:
                                         f.write(part.get_payload(decode=True))
-                                    
+
                                     attachments_list.append({
                                         'filename': filename,
                                         'filepath': os.path.abspath(filepath),
@@ -664,7 +622,6 @@ def fetch_emails(
                                 except Exception as e:
                                     print(f"处理附件失败: {e}")
                     else:
-                        # 单部分邮件
                         try:
                             text_body = msg.get_payload(decode=True).decode(
                                 msg.get_content_charset() or 'utf-8', errors='replace'
@@ -672,7 +629,7 @@ def fetch_emails(
                             total_size = len(msg.get_payload(decode=True))
                         except:
                             pass
-                    
+
                     emails.append({
                         'subject': subject_str,
                         'from': msg.get('From', ''),
@@ -683,14 +640,14 @@ def fetch_emails(
                         'attachments': attachments_list,
                         'size': total_size
                     })
-                    
+
                 except Exception as e:
                     print(f"处理邮件 {mail_id} 失败: {e}")
                     continue
-            
+
             mail.close()
             mail.logout()
-            
+
             return {
                 "success": True,
                 "message": f"成功获取 {len(emails)} 封邮件",
@@ -698,7 +655,7 @@ def fetch_emails(
                 "emails": emails,
                 "attachments_dir": attachment_dir if download_attachments else None
             }
-            
+
         except Exception as e:
             mail.logout()
             return {
@@ -708,7 +665,7 @@ def fetch_emails(
                 "emails": [],
                 "attachments_dir": None
             }
-            
+
     except Exception as e:
         return {
             "success": False,
@@ -718,14 +675,16 @@ def fetch_emails(
             "attachments_dir": None
         }
 
-# 别名 - 与pytoolsz的相关函数兼容
+
 def quicksendemail(*args, **kwargs):
     """兼容旧版本的send_email函数别名"""
     return send_email(*args, **kwargs)
 
+
 def quickemail(*args, **kwargs):
     """兼容旧版本的send_email函数别名"""
     return send_email(*args, **kwargs)
+
 
 def load_email_by_subject(*args, **kwargs):
     """兼容旧版本的fetch_emails函数别名"""
