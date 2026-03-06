@@ -25,7 +25,9 @@ import simtoolsz.countrycode as countrycode
 try:
     __version__ = importlib.metadata.version("simtoolsz")
 except importlib.metadata.PackageNotFoundError:
-    __version__ = "0.2.13"
+    __version__ = "0.2.14"
+
+__author__ = "Sidney Zhang <zly@lyzhang.me>"
 
 __all__ = [
     '__version__', 'mail', 'utils', 'datetime',

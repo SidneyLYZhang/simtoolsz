@@ -26,6 +26,7 @@
 """
 
 import warnings
+import io
 import re
 import polars as pl
 
@@ -40,7 +41,7 @@ from tempfile import TemporaryDirectory
 
 __all__ = [
     "read_tsv", "scan_tsv", "getreader", "load_data", "read_archive",
-    "is_archive_file", "excel_sheet_names", "load_excel"
+    "is_archive_file", "excel_sheet_names", "load_excel", "read_csv_advanced"
 ]
 
 
@@ -651,3 +652,258 @@ def load_excel(
     else:
         raise ValueError(f"Sheet {sheet_name} not found in Excel file")
     return df
+
+
+def read_csv_advanced(
+    path: str | Path,
+    csv_name: Optional[str] = None,
+    start_marker: Optional[str] = "#-------------------------",
+    end_marker: Optional[str] = None,
+    encoding: str = "utf-8",
+    **read_kwargs
+) -> pl.DataFrame:
+    """
+    从 ZIP 压缩包或文件夹中读取被标记行包裹的 CSV 数据。
+
+    匹配规则：只要行首（忽略前导空格）以标识符字符串开头即视为边界，
+    例如 "#------------------------- 数据开始" 会被正确识别。
+    支持不同的起始和结束标识符，标识符只需匹配行的前缀即可。
+
+    Args:
+        path: ZIP 文件路径或文件夹路径
+        csv_name: ZIP 内或文件夹中的 CSV 文件名（可选，单 CSV 文件时可自动检测）
+        start_marker: 起始边界标记的前缀字符串（默认 "#-------------------------"）
+                      设为 None 则从文件开头读取
+        end_marker: 结束边界标记的前缀字符串（默认 None，表示与 start_marker 相同）
+                    设为 None 则使用 start_marker 作为结束标记
+        encoding: 文件编码（默认 utf-8，中文环境常见 gbk/utf-8-sig）
+        **read_kwargs: 传递给 polars.read_csv 的额外参数（如 separator, header 等）
+
+    Returns:
+        pl.DataFrame: 解析后的数据帧
+
+    Raises:
+        FileNotFoundError: 路径不存在
+        ValueError: 未找到 CSV 文件或数据区域为空
+
+    Examples:
+        >>> # 从 ZIP 文件读取（默认标记）
+        >>> df = read_csv_from_zip("data.zip", encoding="gbk")
+        
+        >>> # 从文件夹读取
+        >>> df = read_csv_from_zip("./data_folder", separator="|")
+        
+        >>> # 使用不同的起始和结束标记
+        >>> df = read_csv_from_zip("data.zip", start_marker="=== BEGIN ===", end_marker="=== END ===")
+        
+        >>> # 无标记，读取整个文件
+        >>> df = read_csv_from_zip("data.zip", start_marker=None)
+    """
+    path = Path(path)
+    if not path.exists():
+        raise FileNotFoundError(f"路径不存在: {path}")
+
+    if end_marker is None:
+        end_marker = start_marker
+
+    content = _read_csv_content(path, csv_name, encoding)
+    data_lines = _extract_data_lines(content, start_marker, end_marker)
+
+    if not data_lines:
+        raise ValueError("提取的数据区域为空，请检查标记是否正确")
+
+    csv_content = "\n".join(data_lines)
+    
+    return pl.read_csv(
+        io.BytesIO(csv_content.encode(encoding)),
+        **read_kwargs
+    )
+
+
+def _read_csv_content(path: Path, csv_name: Optional[str], encoding: str) -> str:
+    """
+    从 ZIP 文件或文件夹中读取 CSV 文件的文本内容。
+
+    Args:
+        path: ZIP 文件路径或文件夹路径
+        csv_name: CSV 文件名（可选）
+        encoding: 文件编码
+
+    Returns:
+        str: CSV 文件的文本内容
+    """
+    if path.is_file() and path.suffix.lower() == '.zip':
+        return _read_from_zip_file(path, csv_name, encoding)
+    elif path.is_dir():
+        return _read_from_directory(path, csv_name, encoding)
+    else:
+        raise ValueError(f"路径必须是 ZIP 文件或文件夹: {path}")
+
+
+def _read_from_zip_file(zip_path: Path, csv_name: Optional[str], encoding: str) -> str:
+    """
+    从 ZIP 文件中读取 CSV 内容。
+
+    Args:
+        zip_path: ZIP 文件路径
+        csv_name: CSV 文件名（可选）
+        encoding: 文件编码
+
+    Returns:
+        str: CSV 文件的文本内容
+    """
+    with ZipFile(zip_path, "r") as zf:
+        csv_name = _resolve_csv_name_zip(zf, csv_name, zip_path)
+        with zf.open(csv_name) as f:
+            actual_encoding = "utf-8-sig" if encoding == "utf-8" else encoding
+            return f.read().decode(actual_encoding)
+
+
+def _read_from_directory(dir_path: Path, csv_name: Optional[str], encoding: str) -> str:
+    """
+    从文件夹中读取 CSV 内容。
+
+    Args:
+        dir_path: 文件夹路径
+        csv_name: CSV 文件名（可选）
+        encoding: 文件编码
+
+    Returns:
+        str: CSV 文件的文本内容
+    """
+    csv_file = _resolve_csv_name_dir(dir_path, csv_name)
+    actual_encoding = "utf-8-sig" if encoding == "utf-8" else encoding
+    return csv_file.read_text(encoding=actual_encoding)
+
+
+def _resolve_csv_name_zip(zf, csv_name: Optional[str], zip_path: Path) -> str:
+    """
+    解析 ZIP 文件中的 CSV 文件名。
+
+    Args:
+        zf: ZipFile 对象
+        csv_name: 指定的 CSV 文件名（可选）
+        zip_path: ZIP 文件路径（用于错误信息）
+
+    Returns:
+        str: CSV 文件名
+    """
+    if csv_name is not None:
+        if csv_name not in zf.namelist():
+            raise ValueError(f"ZIP 中不存在文件: {csv_name}")
+        return csv_name
+
+    candidates = [
+        n for n in zf.namelist()
+        if n.lower().endswith(".csv") and not n.startswith("__MACOSX")
+    ]
+
+    if len(candidates) == 0:
+        raise ValueError(f"在 {zip_path} 中未找到 CSV 文件")
+    if len(candidates) > 1:
+        raise ValueError(f"存在多个 CSV 文件，请指定 csv_name: {candidates}")
+
+    return candidates[0]
+
+
+def _resolve_csv_name_dir(dir_path: Path, csv_name: Optional[str]) -> Path:
+    """
+    解析文件夹中的 CSV 文件路径。
+
+    Args:
+        dir_path: 文件夹路径
+        csv_name: 指定的 CSV 文件名（可选）
+
+    Returns:
+        Path: CSV 文件路径
+    """
+    if csv_name is not None:
+        csv_file = dir_path / csv_name
+        if not csv_file.exists():
+            raise ValueError(f"文件夹中不存在文件: {csv_name}")
+        return csv_file
+
+    candidates = [
+        f for f in dir_path.iterdir()
+        if f.is_file() and f.suffix.lower() == ".csv"
+    ]
+
+    if len(candidates) == 0:
+        raise ValueError(f"在 {dir_path} 中未找到 CSV 文件")
+    if len(candidates) > 1:
+        raise ValueError(f"存在多个 CSV 文件，请指定 csv_name: {[f.name for f in candidates]}")
+
+    return candidates[0]
+
+
+def _extract_data_lines(
+    content: str,
+    start_marker: Optional[str],
+    end_marker: Optional[str]
+) -> list[str]:
+    """
+    从内容中提取数据行。
+
+    Args:
+        content: 文件内容
+        start_marker: 起始标记（None 表示从开头开始）
+        end_marker: 结束标记（None 表示到结尾结束）
+
+    Returns:
+        list[str]: 数据行列表
+    """
+    lines = content.splitlines()
+
+    if start_marker is None and end_marker is None:
+        return lines
+
+    start_idx = _find_marker_index(lines, start_marker, find_first=True)
+    end_idx = _find_marker_index(lines, end_marker, find_first=False, start_from=start_idx)
+
+    if start_idx is None:
+        warnings.warn(f"未找到起始标记 '{start_marker}'，将解析整个文件内容")
+        return lines
+
+    data_start = start_idx + 1
+    data_end = end_idx if end_idx is not None else len(lines)
+
+    return lines[data_start:data_end]
+
+
+def _find_marker_index(
+    lines: list[str],
+    marker: Optional[str],
+    find_first: bool = True,
+    start_from: Optional[int] = None
+) -> Optional[int]:
+    """
+    查找标记行的索引。
+
+    Args:
+        lines: 行列表
+        marker: 标记字符串（匹配行的前缀）
+        find_first: True 返回第一个匹配，False 返回最后一个匹配
+        start_from: 开始搜索的索引
+
+    Returns:
+        Optional[int]: 标记行的索引，未找到返回 None
+    """
+    if marker is None:
+        return None
+
+    search_range = range(
+        start_from + 1 if start_from is not None else 0,
+        len(lines)
+    )
+
+    if find_first:
+        for i in search_range:
+            if lines[i].lstrip().startswith(marker):
+                return i
+        return None
+    else:
+        result = None
+        for i in search_range:
+            if lines[i].lstrip().startswith(marker):
+                result = i
+        return result
