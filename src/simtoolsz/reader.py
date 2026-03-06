@@ -752,11 +752,43 @@ def _read_from_zip_file(zip_path: Path, csv_name: Optional[str], encoding: str) 
     Returns:
         str: CSV 文件的文本内容
     """
-    with ZipFile(zip_path, "r") as zf:
-        csv_name = _resolve_csv_name_zip(zf, csv_name, zip_path)
-        with zf.open(csv_name) as f:
+    zf = _open_zip_with_encoding(zip_path)
+    try:
+        resolved_csv_name = _resolve_csv_name_zip(zf, csv_name, zip_path)
+        with zf.open(resolved_csv_name) as f:
             actual_encoding = "utf-8-sig" if encoding == "utf-8" else encoding
             return f.read().decode(actual_encoding)
+    finally:
+        zf.close()
+
+
+def _open_zip_with_encoding(zip_path: Path) -> ZipFile:
+    """
+    以正确的编码打开 ZIP 文件，解决中文文件名乱码问题。
+
+    优先尝试 GBK 编码（中文 Windows 常见），失败则使用默认编码。
+
+    Args:
+        zip_path: ZIP 文件路径
+
+    Returns:
+        ZipFile: 打开的 ZipFile 对象
+    """
+    try:
+        zf = ZipFile(zip_path, "r", metadata_encoding="gbk")
+        zf.namelist()
+        return zf
+    except (UnicodeDecodeError, LookupError):
+        pass
+    
+    try:
+        zf = ZipFile(zip_path, "r", metadata_encoding="cp936")
+        zf.namelist()
+        return zf
+    except (UnicodeDecodeError, LookupError):
+        pass
+    
+    return ZipFile(zip_path, "r")
 
 
 def _read_from_directory(dir_path: Path, csv_name: Optional[str], encoding: str) -> str:
