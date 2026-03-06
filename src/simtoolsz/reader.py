@@ -715,7 +715,7 @@ def read_csv_advanced(
     csv_content = "\n".join(data_lines)
     
     return pl.read_csv(
-        io.BytesIO(csv_content.encode(encoding)),
+        io.BytesIO(csv_content.encode("utf-8")),
         **read_kwargs
     )
 
