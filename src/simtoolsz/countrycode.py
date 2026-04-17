@@ -32,16 +32,38 @@ from typing import Any, Iterable
 __all__ = ["CountryCode", "is_data_container", "country_convert"]
 
 
-UNIQUE_IDS = ['ISO2', 'ISO3', "name_short", "name_zh", "official_name_zh", "name_official"]
+UNIQUE_IDS = [
+    "ISO2",
+    "ISO3",
+    "name_short",
+    "name_zh",
+    "official_name_zh",
+    "name_official",
+]
 
 codedata = Path(__file__).parent.resolve() / "country.parquet"
 infodata = Path(__file__).parent.resolve() / "columns_info"
 
 valid_trans = {
     "name_short": ["short", "short_name", "name", "names"],
-    "name_zh": ["zh", "short_zh", "name_short_zh", "short_name_zh", "names_zh", "zh_name", "zh_names", "中文"],
+    "name_zh": [
+        "zh",
+        "short_zh",
+        "name_short_zh",
+        "short_name_zh",
+        "names_zh",
+        "zh_name",
+        "zh_names",
+        "中文",
+    ],
     "name_official": ["official", "long_name", "long"],
-    "official_name_zh": ["official_zh", "long_name_zh", "long_zh", "langzh", "正式中文"],
+    "official_name_zh": [
+        "official_zh",
+        "long_name_zh",
+        "long_zh",
+        "langzh",
+        "正式中文",
+    ],
     "UNcode": ["un", "unnumeric", "M49"],
     "ISO3": ["alpha_3", "ISO_3", "iso3", "iso3166_alpha_3", "ISO3166-2"],
     "ISO2": ["alpha_2", "ISO_2", "iso2", "iso3166_alpha_2", "ISO3166-1"],
@@ -71,7 +93,7 @@ def is_data_container(data: Any) -> bool:
         >>> is_data_container("hello")
         False
     """
-    if hasattr(data, 'shape'):
+    if hasattr(data, "shape"):
         return True
     elif isinstance(data, (list, tuple, set, dict)):
         return True
@@ -113,17 +135,19 @@ class CountryCode:
         regex_list = self._data.select(pl.col("regex")).collect()["regex"].to_list()
         self._reges = [
             re.compile(entry, re.IGNORECASE)
-            for entry in regex_list if entry is not None]
+            for entry in regex_list
+            if entry is not None
+        ]
 
         iso2_list = self._data.select(pl.col("ISO2")).collect()["ISO2"].to_list()
         self._reges_ISO2 = [
-            re.compile(entry, re.IGNORECASE)
-            for entry in iso2_list if entry is not None]
+            re.compile(entry, re.IGNORECASE) for entry in iso2_list if entry is not None
+        ]
 
         iso3_list = self._data.select(pl.col("ISO3")).collect()["ISO3"].to_list()
         self._reges_ISO3 = [
-            re.compile(entry, re.IGNORECASE)
-            for entry in iso3_list if entry is not None]
+            re.compile(entry, re.IGNORECASE) for entry in iso3_list if entry is not None
+        ]
 
     @property
     def all_valid_class(self) -> list[str]:
@@ -190,6 +214,7 @@ class CountryCode:
         Returns:
             str | list[str]: 识别出的格式类型
         """
+
         def _guess_single(xc: int | str) -> str:
             try:
                 int(xc)
@@ -268,8 +293,7 @@ class CountryCode:
             return None
 
     def _lazy_find(
-        self, txt: str | int, colname: str,
-        use_regex: bool = False
+        self, txt: str | int, colname: str, use_regex: bool = False
     ) -> pl.DataFrame:
         """
         在数据中查找匹配的记录。
@@ -287,7 +311,11 @@ class CountryCode:
             clength = len(self._data.select(pl.col(colname)).collect())
             for i in range(clength):
                 row = self._data.slice(i, 1).collect()
-                irex = self._which_regex(colname)[i] if i < len(self._which_regex(colname)) else None
+                irex = (
+                    self._which_regex(colname)[i]
+                    if i < len(self._which_regex(colname))
+                    else None
+                )
                 if irex and irex.search(str(txt)):
                     res = pl.concat([res, row])
         else:
@@ -315,15 +343,19 @@ class CountryCode:
             # 返回包含 name_short, name_zh, ISO2 列的数据
         """
         type_n = [self._get_valid_codename(ctype_)]
-        extra_l = [self._get_valid_codename(i) for i in extra] if extra is not None else []
+        extra_l = (
+            [self._get_valid_codename(i) for i in extra] if extra is not None else []
+        )
         oricols = list(set[str](["name_short", "name_zh"] + type_n + extra_l))
         return self._data.select(pl.col(oricols)).drop_nulls().collect()
 
     def convert(
-        self, code: int | str | Iterable[str | int],
-        source: str = "auto", target: str = "name_zh",
+        self,
+        code: int | str | Iterable[str | int],
+        source: str = "auto",
+        target: str = "name_zh",
         not_found: str | None = None,
-        use_regex: bool = False
+        use_regex: bool = False,
     ) -> str | list[str]:
         """
         转换国家代码到指定格式。
@@ -378,7 +410,7 @@ class CountryCode:
                 src = source
 
             if use_regex:
-                res = self._lazy_find(single_code, 'regex', use_regex)
+                res = self._lazy_find(single_code, "regex", use_regex)
             else:
                 res = self._lazy_find(single_code, src, use_regex)
 
@@ -386,7 +418,9 @@ class CountryCode:
                 results.append(not_found)
             else:
                 if len(res) > 1:
-                    print(f"警告：输入 {single_code} 对应多个国家代码，仅返回第一个结果")
+                    print(
+                        f"警告：输入 {single_code} 对应多个国家代码，仅返回第一个结果"
+                    )
                 results.append(res[tgt].to_list()[0])
 
         if is_single:
@@ -395,11 +429,13 @@ class CountryCode:
             return results
 
     def covert_series(
-        self, series: Any,
-        source: str = "auto", target: str = "name_zh",
+        self,
+        series: Any,
+        source: str = "auto",
+        target: str = "name_zh",
         not_found: str | None = None,
         use_regex: bool = False,
-        out_type: str = "series"
+        out_type: str = "series",
     ) -> pl.Series | pl.DataFrame | list[Any]:
         """
         转换可迭代对象中的国家代码。
@@ -424,10 +460,7 @@ class CountryCode:
         if out_type == "series":
             return pl.Series(name=target, values=res_list)
         elif out_type == "dataframe":
-            return pl.DataFrame({
-                source: series,
-                target: res_list
-            })
+            return pl.DataFrame({source: series, target: res_list})
         elif out_type == "list":
             return res_list
         else:
@@ -436,10 +469,11 @@ class CountryCode:
 
 def country_convert(
     txt: str | Iterable[str | int],
-    src: str = "ISO3", to: str = "name_zh",
+    src: str = "ISO3",
+    to: str = "name_zh",
     not_found: str | None = None,
     use_regex: bool = False,
-    additional_data: dict | pl.DataFrame | None = None
+    additional_data: dict | pl.DataFrame | None = None,
 ) -> str | list[str]:
     """
     转换各类国家代码到指定类型的快捷函数。
@@ -472,27 +506,52 @@ def country_convert(
     """
     converter = CountryCode(additional_data)
     if is_data_container(txt):
-        if hasattr(txt, 'shape') and hasattr(txt, 'columns'):
+        if hasattr(txt, "shape") and hasattr(txt, "columns"):
             return converter.covert_series(
-                txt[src], source=src, target=to,
-                not_found=not_found, use_regex=use_regex, out_type="list")
+                txt[src],
+                source=src,
+                target=to,
+                not_found=not_found,
+                use_regex=use_regex,
+                out_type="list",
+            )
         elif isinstance(txt, dict):
             temp = txt[src]
             if isinstance(temp, (list, tuple, set, pl.Series)):
                 return converter.covert_series(
                     temp,
-                    source=src, target=to,
-                    not_found=not_found, use_regex=use_regex, out_type="list")
+                    source=src,
+                    target=to,
+                    not_found=not_found,
+                    use_regex=use_regex,
+                    out_type="list",
+                )
             elif isinstance(temp, (str, int)):
                 return converter.convert(
-                    temp, source=src, target=to,
-                    not_found=not_found, use_regex=use_regex)
+                    temp,
+                    source=src,
+                    target=to,
+                    not_found=not_found,
+                    use_regex=use_regex,
+                )
         elif isinstance(txt, pl.Series):
             return converter.covert_series(
-                txt, source=src, target=to,
-                not_found=not_found, use_regex=use_regex, out_type="list")
+                txt,
+                source=src,
+                target=to,
+                not_found=not_found,
+                use_regex=use_regex,
+                out_type="list",
+            )
         elif isinstance(txt, (list, tuple, set)):
             return converter.covert_series(
-                txt, source=src, target=to,
-                not_found=not_found, use_regex=use_regex, out_type="list")
-    return converter.convert(txt, source=src, target=to, not_found=not_found, use_regex=use_regex)
+                txt,
+                source=src,
+                target=to,
+                not_found=not_found,
+                use_regex=use_regex,
+                out_type="list",
+            )
+    return converter.convert(
+        txt, source=src, target=to, not_found=not_found, use_regex=use_regex
+    )

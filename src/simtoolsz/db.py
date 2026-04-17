@@ -25,14 +25,16 @@ from zipfile import ZipFile
 
 import duckdb
 
-__all__ = ['zip2db', 'special2db', 'multizip2db']
+__all__ = ["zip2db", "special2db", "multizip2db"]
 
 
-def zip2db(zip_file: Path, db_file: Path,
-           filename: Optional[str] = None,
-           table: Optional[Union[Dict[str, str], List[str], str]] = None,
-           **kwargs
-           ) -> duckdb.DuckDBPyConnection:
+def zip2db(
+    zip_file: Path,
+    db_file: Path,
+    filename: Optional[str] = None,
+    table: Optional[Union[Dict[str, str], List[str], str]] = None,
+    **kwargs,
+) -> duckdb.DuckDBPyConnection:
     """
     读取zip压缩包中的数据文件并导入到DuckDB数据库。
 
@@ -57,15 +59,15 @@ def zip2db(zip_file: Path, db_file: Path,
     Examples:
         >>> # 读取zip中所有数据文件
         >>> con = zip2db('data.zip', 'output.db')
-        
+
         >>> # 读取指定文件
         >>> con = zip2db('data.zip', 'output.db', filename='users.csv')
-        
+
         >>> # 指定表名映射
         >>> con = zip2db('data.zip', 'output.db', table={'users.csv': '用户表'})
     """
     with TemporaryDirectory() as tmpdir:
-        with ZipFile(zip_file, 'r') as zip_ref:
+        with ZipFile(zip_file, "r") as zip_ref:
             zip_ref.extractall(tmpdir)
 
         tmpdir_path = Path(tmpdir)
@@ -73,7 +75,7 @@ def zip2db(zip_file: Path, db_file: Path,
         if filename:
             data_files = [tmpdir_path / filename]
         else:
-            supported_extensions = ['*.csv', '*.xlsx', '*.parquet', '*.json']
+            supported_extensions = ["*.csv", "*.xlsx", "*.parquet", "*.json"]
             data_files = []
             for ext in supported_extensions:
                 data_files.extend(tmpdir_path.glob(ext))
@@ -101,29 +103,33 @@ def zip2db(zip_file: Path, db_file: Path,
             else:
                 table_name = data_file.stem
 
-            table_name = ''.join(c for c in table_name if c.isalnum() or c == '_')
+            table_name = "".join(c for c in table_name if c.isalnum() or c == "_")
 
             suffix = data_file.suffix.lower()
 
             try:
-                kwargs_str = ', '.join([f"{k}='{v}'" for k, v in kwargs.items()]) if kwargs else ''
+                kwargs_str = (
+                    ", ".join([f"{k}='{v}'" for k, v in kwargs.items()])
+                    if kwargs
+                    else ""
+                )
 
-                if suffix == '.csv':
+                if suffix == ".csv":
                     if kwargs_str:
                         read_query = f"CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto('{data_file}', {kwargs_str})"
                     else:
                         read_query = f"CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto('{data_file}')"
-                elif suffix == '.xlsx':
+                elif suffix == ".xlsx":
                     if kwargs_str:
                         read_query = f"CREATE TABLE {table_name} AS SELECT * FROM st_read('{data_file}', {kwargs_str})"
                     else:
                         read_query = f"CREATE TABLE {table_name} AS SELECT * FROM st_read('{data_file}')"
-                elif suffix == '.parquet':
+                elif suffix == ".parquet":
                     if kwargs_str:
                         read_query = f"CREATE TABLE {table_name} AS SELECT * FROM read_parquet('{data_file}', {kwargs_str})"
                     else:
                         read_query = f"CREATE TABLE {table_name} AS SELECT * FROM read_parquet('{data_file}')"
-                elif suffix == '.json':
+                elif suffix == ".json":
                     if kwargs_str:
                         read_query = f"CREATE TABLE {table_name} AS SELECT * FROM read_json_auto('{data_file}', {kwargs_str})"
                     else:
@@ -142,9 +148,9 @@ def zip2db(zip_file: Path, db_file: Path,
     return con
 
 
-def special2db(data_path: Path, db_path: Path,
-               table: Optional[str] = None, **kwargs
-               ) -> duckdb.DuckDBPyConnection:
+def special2db(
+    data_path: Path, db_path: Path, table: Optional[str] = None, **kwargs
+) -> duckdb.DuckDBPyConnection:
     """
     将特殊格式的文件转换为DuckDB数据库。
 
@@ -168,13 +174,13 @@ def special2db(data_path: Path, db_path: Path,
     Examples:
         >>> # 读取单个TSV文件
         >>> con = special2db('data/users.tsv', 'users.db')
-        
+
         >>> # 使用自定义表名
         >>> con = special2db('data/customers.tsv', 'customers.db', table='客户表')
-        
+
         >>> # 处理目录中的多个文件
         >>> con = special2db('data_directory', 'all_data.db')
-        
+
         >>> # 指定编码和其他参数
         >>> con = special2db('data/data.tsv', 'output.db', encoding='utf-8', header=True)
     """
@@ -185,11 +191,13 @@ def special2db(data_path: Path, db_path: Path,
 
     if data_path.is_file():
         suffix = data_path.suffix.lower()
-        if suffix not in ['.tsv', '.avro', '.arrow']:
-            raise ValueError(f"不支持的文件格式: {suffix}。支持的格式: tsv, avro, arrow")
+        if suffix not in [".tsv", ".avro", ".arrow"]:
+            raise ValueError(
+                f"不支持的文件格式: {suffix}。支持的格式: tsv, avro, arrow"
+            )
         data_files = [data_path]
     else:
-        supported_extensions = ['*.tsv', '*.avro', '*.arrow']
+        supported_extensions = ["*.tsv", "*.avro", "*.arrow"]
         data_files = []
         for ext in supported_extensions:
             data_files.extend(data_path.glob(ext))
@@ -206,24 +214,26 @@ def special2db(data_path: Path, db_path: Path,
         else:
             table_name = data_file.stem
 
-        table_name = ''.join(c for c in table_name if c.isalnum() or c == '_')
+        table_name = "".join(c for c in table_name if c.isalnum() or c == "_")
 
         suffix = data_file.suffix.lower()
 
         try:
-            kwargs_str = ', '.join([f"{k}='{v}'" for k, v in kwargs.items()]) if kwargs else ''
+            kwargs_str = (
+                ", ".join([f"{k}='{v}'" for k, v in kwargs.items()]) if kwargs else ""
+            )
 
-            if suffix == '.tsv':
+            if suffix == ".tsv":
                 if kwargs_str:
                     read_query = f"CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto('{data_file}', delim='\\t', {kwargs_str})"
                 else:
                     read_query = f"CREATE TABLE {table_name} AS SELECT * FROM read_csv_auto('{data_file}', delim='\\t')"
-            elif suffix == '.avro':
+            elif suffix == ".avro":
                 if kwargs_str:
                     read_query = f"CREATE TABLE {table_name} AS SELECT * FROM read_avro('{data_file}', {kwargs_str})"
                 else:
                     read_query = f"CREATE TABLE {table_name} AS SELECT * FROM read_avro('{data_file}')"
-            elif suffix == '.arrow':
+            elif suffix == ".arrow":
                 if kwargs_str:
                     read_query = f"CREATE TABLE {table_name} AS SELECT * FROM read_arrow('{data_file}', {kwargs_str})"
                 else:
@@ -242,10 +252,13 @@ def special2db(data_path: Path, db_path: Path,
     return con
 
 
-def multizip2db(ziplist: list[Path], filenames: str | list[str],
-                db_path: Optional[Path] = None,
-                table: Optional[str] = None, **kwargs
-                ) -> duckdb.DuckDBPyConnection:
+def multizip2db(
+    ziplist: list[Path],
+    filenames: str | list[str],
+    db_path: Optional[Path] = None,
+    table: Optional[str] = None,
+    **kwargs,
+) -> duckdb.DuckDBPyConnection:
     """
     将多个压缩包中指定的文件的数据合并后转换到DuckDB数据库中。
 
@@ -269,7 +282,7 @@ def multizip2db(ziplist: list[Path], filenames: str | list[str],
     Examples:
         >>> # 从多个zip中读取同名文件并合并
         >>> con = multizip2db(['data1.zip', 'data2.zip'], 'users.csv', 'merged.db')
-        
+
         >>> # 使用通配符匹配文件
         >>> con = multizip2db(['data1.zip', 'data2.zip'], '*.csv', 'all_data.db', table='combined')
     """
@@ -291,7 +304,7 @@ def multizip2db(ziplist: list[Path], filenames: str | list[str],
                     print(f"压缩包不存在: {zip_path}")
                     continue
 
-                with ZipFile(zip_path, 'r') as zip_ref:
+                with ZipFile(zip_path, "r") as zip_ref:
                     zip_ref.extractall(tmpdir_path)
 
                     for filename_pattern in filenames:
@@ -306,34 +319,44 @@ def multizip2db(ziplist: list[Path], filenames: str | list[str],
                             else:
                                 table_name = data_file.stem
 
-                            table_name = ''.join(c for c in table_name if c.isalnum() or c == '_')
+                            table_name = "".join(
+                                c for c in table_name if c.isalnum() or c == "_"
+                            )
 
                             suffix = data_file.suffix.lower()
 
                             try:
-                                kwargs_str = ', '.join([f"{k}='{v}'" for k, v in kwargs.items()]) if kwargs else ''
+                                kwargs_str = (
+                                    ", ".join([f"{k}='{v}'" for k, v in kwargs.items()])
+                                    if kwargs
+                                    else ""
+                                )
 
-                                if suffix == '.csv':
+                                if suffix == ".csv":
                                     if kwargs_str:
                                         read_query = f"SELECT * FROM read_csv_auto('{data_file}', {kwargs_str})"
                                     else:
                                         read_query = f"SELECT * FROM read_csv_auto('{data_file}')"
-                                elif suffix == '.xlsx':
+                                elif suffix == ".xlsx":
                                     if kwargs_str:
                                         read_query = f"SELECT * FROM st_read('{data_file}', {kwargs_str})"
                                     else:
-                                        read_query = f"SELECT * FROM st_read('{data_file}')"
-                                elif suffix == '.parquet':
+                                        read_query = (
+                                            f"SELECT * FROM st_read('{data_file}')"
+                                        )
+                                elif suffix == ".parquet":
                                     if kwargs_str:
                                         read_query = f"SELECT * FROM read_parquet('{data_file}', {kwargs_str})"
                                     else:
-                                        read_query = f"SELECT * FROM read_parquet('{data_file}')"
-                                elif suffix == '.json':
+                                        read_query = (
+                                            f"SELECT * FROM read_parquet('{data_file}')"
+                                        )
+                                elif suffix == ".json":
                                     if kwargs_str:
                                         read_query = f"SELECT * FROM read_json_auto('{data_file}', {kwargs_str})"
                                     else:
                                         read_query = f"SELECT * FROM read_json_auto('{data_file}')"
-                                elif suffix == '.tsv':
+                                elif suffix == ".tsv":
                                     if kwargs_str:
                                         read_query = f"SELECT * FROM read_csv_auto('{data_file}', delim='\\t', {kwargs_str})"
                                     else:
@@ -342,12 +365,18 @@ def multizip2db(ziplist: list[Path], filenames: str | list[str],
                                     continue
 
                                 existing_tables = con.execute("SHOW TABLES").fetchall()
-                                table_exists = any(table_name == t[0] for t in existing_tables)
+                                table_exists = any(
+                                    table_name == t[0] for t in existing_tables
+                                )
 
                                 if table_exists:
-                                    con.execute(f"INSERT INTO {table_name} {read_query}")
+                                    con.execute(
+                                        f"INSERT INTO {table_name} {read_query}"
+                                    )
                                 else:
-                                    con.execute(f"CREATE TABLE {table_name} AS {read_query}")
+                                    con.execute(
+                                        f"CREATE TABLE {table_name} AS {read_query}"
+                                    )
 
                             except Exception as e:
                                 print(f"处理文件 {data_file.name} 时出错: {e}")

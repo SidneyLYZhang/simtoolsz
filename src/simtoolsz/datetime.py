@@ -29,13 +29,16 @@ import datetime as dt
 
 
 __all__ = [
-    'TimeConversion', 'DurationFormat', 'DURATIONTYPE',
-    'covertChineseShort', 'getTimeSpan'
+    "TimeConversion",
+    "DurationFormat",
+    "DURATIONTYPE",
+    "covertChineseShort",
+    "getTimeSpan",
 ]
 
-DURATIONTYPE = NewType('DURATIONTYPE', str | Number | plm.Duration)
+DURATIONTYPE = NewType("DURATIONTYPE", str | Number | plm.Duration)
 
-DATETIMESETS = NewType('DATETIMESETS', plm.DateTime | dt.datetime)
+DATETIMESETS = NewType("DATETIMESETS", plm.DateTime | dt.datetime)
 
 
 class DurationFormat(Enum):
@@ -62,15 +65,15 @@ class DurationFormat(Enum):
         <DurationFormat.CHINESE: 'chinese'>
     """
 
-    SECONDS = 'seconds'
-    MILLISECONDS = 'milliseconds'
-    MINUTES = 'minutes'
-    HOURS = 'hours'
-    ISO8601 = 'iso8601'
-    CHINESE = 'chinese'
-    ENGLISH = 'english'
-    COLON = 'colon-separated'
-    DURATION = 'duration'
+    SECONDS = "seconds"
+    MILLISECONDS = "milliseconds"
+    MINUTES = "minutes"
+    HOURS = "hours"
+    ISO8601 = "iso8601"
+    CHINESE = "chinese"
+    ENGLISH = "english"
+    COLON = "colon-separated"
+    DURATION = "duration"
 
     def __str__(self) -> str:
         """返回格式的字符串表示"""
@@ -125,8 +128,9 @@ class DurationFormat(Enum):
         return [f.value for f in cls]
 
     @classmethod
-    def which_format(cls, value: DURATIONTYPE,
-                     cast: str | None = None) -> Optional[Self]:
+    def which_format(
+        cls, value: DURATIONTYPE, cast: str | None = None
+    ) -> Optional[Self]:
         """
         根据输入内容，自动判断属于哪种时间持续格式。
 
@@ -187,18 +191,20 @@ class DurationFormat(Enum):
             if not value:
                 return None
 
-            if any(unit in value for unit in ['天', '小时', '分钟', '秒钟', '毫秒']):
+            if any(unit in value for unit in ["天", "小时", "分钟", "秒钟", "毫秒"]):
                 return cls.CHINESE
 
-            english_pattern = r'^\s*\d+(\.\d+)?\s*(days?|hours?|minutes?|seconds?|milliseconds?)\s*$'
+            english_pattern = (
+                r"^\s*\d+(\.\d+)?\s*(days?|hours?|minutes?|seconds?|milliseconds?)\s*$"
+            )
             if re.match(english_pattern, value, re.IGNORECASE):
                 return cls.ENGLISH
 
-            colon_pattern = r'^\s*\d{1,2}(:\d{1,2}){1,2}\s*$'
+            colon_pattern = r"^\s*\d{1,2}(:\d{1,2}){1,2}\s*$"
             if re.match(colon_pattern, value):
                 return cls.COLON
 
-            iso_pattern = r'^P(\d+D)?(T(\d+H)?(\d+M)?(\d+S)?)?$'
+            iso_pattern = r"^P(\d+D)?(T(\d+H)?(\d+M)?(\d+S)?)?$"
             if re.match(iso_pattern, value.upper()):
                 return cls.ISO8601
 
@@ -213,8 +219,12 @@ class DurationFormat(Enum):
     @property
     def is_time_unit(self) -> bool:
         """判断是否为时间单位格式（秒、毫秒、分钟、小时）"""
-        return self.value in {self.SECONDS.value, self.MILLISECONDS.value,
-                              self.MINUTES.value, self.HOURS.value}
+        return self.value in {
+            self.SECONDS.value,
+            self.MILLISECONDS.value,
+            self.MINUTES.value,
+            self.HOURS.value,
+        }
 
     @property
     def is_human_readable(self) -> bool:
@@ -229,7 +239,7 @@ class ConversionType(object):
     负责将各种格式的输入转换为pendulum.Duration，以及将Duration转换为目标格式。
     """
 
-    __all__ = ['fit']
+    __all__ = ["fit"]
 
     def __init__(self, type: DurationFormat) -> None:
         """
@@ -310,33 +320,33 @@ class ConversionType(object):
         total_seconds = 0
         matched = False
 
-        match = re.search(r'(\d+(?:\.\d+)?)\s*天', value)
+        match = re.search(r"(\d+(?:\.\d+)?)\s*天", value)
         if match:
             total_seconds += float(match.group(1)) * 86400
             matched = True
 
-        match = re.search(r'(\d+(?:\.\d+)?)\s*小时', value)
+        match = re.search(r"(\d+(?:\.\d+)?)\s*小时", value)
         if not match:
-            match = re.search(r'(\d+(?:\.\d+)?)\s*时', value)
+            match = re.search(r"(\d+(?:\.\d+)?)\s*时", value)
         if match:
             total_seconds += float(match.group(1)) * 3600
             matched = True
 
-        match = re.search(r'(\d+(?:\.\d+)?)\s*分钟', value)
+        match = re.search(r"(\d+(?:\.\d+)?)\s*分钟", value)
         if not match:
-            match = re.search(r'(\d+(?:\.\d+)?)\s*分', value)
+            match = re.search(r"(\d+(?:\.\d+)?)\s*分", value)
         if match:
             total_seconds += float(match.group(1)) * 60
             matched = True
 
-        match = re.search(r'(\d+(?:\.\d+)?)\s*秒钟', value)
+        match = re.search(r"(\d+(?:\.\d+)?)\s*秒钟", value)
         if not match:
-            match = re.search(r'(\d+(?:\.\d+)?)\s*秒', value)
+            match = re.search(r"(\d+(?:\.\d+)?)\s*秒", value)
         if match:
             total_seconds += float(match.group(1)) * 1
             matched = True
 
-        match = re.search(r'(\d+(?:\.\d+)?)\s*毫秒', value)
+        match = re.search(r"(\d+(?:\.\d+)?)\s*毫秒", value)
         if match:
             total_seconds += float(match.group(1)) * 0.001
             matched = True
@@ -363,7 +373,7 @@ class ConversionType(object):
         """
         import re
 
-        pattern = r'(\d+(?:\.\d+)?)\s*([a-zA-Z]+)'
+        pattern = r"(\d+(?:\.\d+)?)\s*([a-zA-Z]+)"
         matches = re.findall(pattern, value)
 
         if not matches:
@@ -371,16 +381,16 @@ class ConversionType(object):
 
         total_seconds = 0
         unit_mapping = {
-            'days': 86400,
-            'day': 86400,
-            'hours': 3600,
-            'hour': 3600,
-            'minutes': 60,
-            'minute': 60,
-            'seconds': 1,
-            'second': 1,
-            'milliseconds': 0.001,
-            'millisecond': 0.001
+            "days": 86400,
+            "day": 86400,
+            "hours": 3600,
+            "hour": 3600,
+            "minutes": 60,
+            "minute": 60,
+            "seconds": 1,
+            "second": 1,
+            "milliseconds": 0.001,
+            "millisecond": 0.001,
         }
 
         for num_str, unit in matches:
@@ -407,7 +417,7 @@ class ConversionType(object):
         Returns:
             plm.Duration: 解析后的Duration对象
         """
-        parts = value.split(':')
+        parts = value.split(":")
 
         if len(parts) == 2:
             minutes, seconds = map(float, parts)
@@ -434,47 +444,49 @@ class ConversionType(object):
         import re
 
         value = value.strip()
-        if not value.startswith('P'):
+        if not value.startswith("P"):
             raise ValueError(f"无效的ISO 8601格式: {value} (必须以P开头)")
 
         duration_str = value[1:]
 
         total_seconds = 0
 
-        if 'T' in duration_str:
-            date_part, time_part = duration_str.split('T', 1)
+        if "T" in duration_str:
+            date_part, time_part = duration_str.split("T", 1)
         else:
             date_part = duration_str
-            time_part = ''
+            time_part = ""
 
         if date_part:
-            day_match = re.search(r'(\d+(?:\.\d+)?)D', date_part)
+            day_match = re.search(r"(\d+(?:\.\d+)?)D", date_part)
             if day_match:
                 total_seconds += float(day_match.group(1)) * 86400
 
-            week_match = re.search(r'(\d+(?:\.\d+)?)W', date_part)
+            week_match = re.search(r"(\d+(?:\.\d+)?)W", date_part)
             if week_match:
                 total_seconds += float(week_match.group(1)) * 7 * 86400
 
         if time_part:
-            hour_match = re.search(r'(\d+(?:\.\d+)?)H', time_part)
+            hour_match = re.search(r"(\d+(?:\.\d+)?)H", time_part)
             if hour_match:
                 total_seconds += float(hour_match.group(1)) * 3600
 
-            minute_match = re.search(r'(\d+(?:\.\d+)?)M', time_part)
+            minute_match = re.search(r"(\d+(?:\.\d+)?)M", time_part)
             if minute_match:
                 total_seconds += float(minute_match.group(1)) * 60
 
-            second_match = re.search(r'(\d+(?:\.\d+)?)S', time_part)
+            second_match = re.search(r"(\d+(?:\.\d+)?)S", time_part)
             if second_match:
                 total_seconds += float(second_match.group(1))
 
-        if total_seconds == 0 and value != 'PT0S':
+        if total_seconds == 0 and value != "PT0S":
             raise ValueError(f"无效的ISO 8601格式: {value} (没有有效的时间单位)")
 
         return plm.duration(seconds=total_seconds)
 
-    def _duration_to_target(self, duration: plm.Duration, target_format: DurationFormat) -> DURATIONTYPE:
+    def _duration_to_target(
+        self, duration: plm.Duration, target_format: DurationFormat
+    ) -> DURATIONTYPE:
         """
         将Duration转换为目标格式。
 
@@ -544,7 +556,7 @@ class ConversionType(object):
                 if int(seconds) != 0:
                     time_parts.append(f"{int(seconds)}S")
             else:
-                seconds_str = f"{seconds:.6f}".rstrip('0').rstrip('.')
+                seconds_str = f"{seconds:.6f}".rstrip("0").rstrip(".")
                 time_parts.append(f"{seconds_str}S")
 
         result = "P"
@@ -624,7 +636,9 @@ class ConversionType(object):
         if seconds > 0:
             parts.append(f"{seconds} second{'s' if seconds != 1 else ''}")
         if milliseconds > 0:
-            parts.append(f"{milliseconds} millisecond{'s' if milliseconds != 1 else ''}")
+            parts.append(
+                f"{milliseconds} millisecond{'s' if milliseconds != 1 else ''}"
+            )
 
         return " ".join(parts) if parts else "0 seconds"
 
@@ -662,6 +676,7 @@ class ConversionType(object):
             >>> to_seconds("1小时30分钟")
             5400
         """
+
         def converter(value: DURATIONTYPE) -> DURATIONTYPE:
             try:
                 duration = self._parse_to_duration(value)
@@ -691,8 +706,9 @@ class TimeConversion(object):
         '1 day'
     """
 
-    def __init__(self, time: DURATIONTYPE,
-                 inFormat: str | DurationFormat | None = None) -> None:
+    def __init__(
+        self, time: DURATIONTYPE, inFormat: str | DurationFormat | None = None
+    ) -> None:
         """
         初始化时间转换器。
 
@@ -800,11 +816,13 @@ def covertChineseShort(time: DURATIONTYPE) -> str:
     return res
 
 
-def getTimeSpan(baseDate: DATETIMESETS | str | None,
-                interval: str = "4 days",
-                direction: str = "forward",
-                youtube: bool = False,
-                fmt: str | None = None) -> tuple:
+def getTimeSpan(
+    baseDate: DATETIMESETS | str | None,
+    interval: str = "4 days",
+    direction: str = "forward",
+    youtube: bool = False,
+    fmt: str | None = None,
+) -> tuple:
     """
     基于基准时间获取一个时间间隔。
 
@@ -860,18 +878,20 @@ def getTimeSpan(baseDate: DATETIMESETS | str | None,
 
     unit = unit.lower()
     unit_mapping = {
-        'day': 'days',
-        'days': 'days',
-        'week': 'weeks',
-        'weeks': 'weeks',
-        'month': 'months',
-        'months': 'months',
-        'year': 'years',
-        'years': 'years',
+        "day": "days",
+        "days": "days",
+        "week": "weeks",
+        "weeks": "weeks",
+        "month": "months",
+        "months": "months",
+        "year": "years",
+        "years": "years",
     }
 
     if unit not in unit_mapping:
-        raise ValueError(f"不支持的时间单位: {unit}，支持: day(s), week(s), month(s), year(s)")
+        raise ValueError(
+            f"不支持的时间单位: {unit}，支持: day(s), week(s), month(s), year(s)"
+        )
 
     delta_kwargs = {unit_mapping[unit]: value}
 

@@ -40,13 +40,21 @@ from tempfile import TemporaryDirectory
 
 
 __all__ = [
-    "read_tsv", "scan_tsv", "getreader", "load_data", "read_archive",
-    "is_archive_file", "excel_sheet_names", "load_excel", "read_csv_advanced"
+    "read_tsv",
+    "scan_tsv",
+    "getreader",
+    "load_data",
+    "read_archive",
+    "is_archive_file",
+    "excel_sheet_names",
+    "load_excel",
+    "read_csv_advanced",
 ]
 
 
-def read_tsv(filepath: Path, lazy: bool = False, **kwargs
-             ) -> pl.DataFrame | pl.LazyFrame:
+def read_tsv(
+    filepath: Path, lazy: bool = False, **kwargs
+) -> pl.DataFrame | pl.LazyFrame:
     """
     读取TSV文件（制表符分隔值文件）。
 
@@ -76,19 +84,9 @@ def read_tsv(filepath: Path, lazy: bool = False, **kwargs
 
     try:
         if lazy:
-            return pl.scan_csv(
-                filepath,
-                separator='\t',
-                quote_char=None,
-                **kwargs
-            )
+            return pl.scan_csv(filepath, separator="\t", quote_char=None, **kwargs)
         else:
-            return pl.read_csv(
-                filepath,
-                separator='\t',
-                quote_char=None,
-                **kwargs
-            )
+            return pl.read_csv(filepath, separator="\t", quote_char=None, **kwargs)
     except Exception as e:
         raise ValueError(f"Failed to read TSV file {filepath}: {e}")
 
@@ -110,7 +108,9 @@ def scan_tsv(filepath: Path, **kwargs) -> pl.LazyFrame:
     return read_tsv(filepath, lazy=True, **kwargs)
 
 
-def _validate_input(file_path: Path | str, format_type: Optional[str]) -> tuple[Path, str]:
+def _validate_input(
+    file_path: Path | str, format_type: Optional[str]
+) -> tuple[Path, str]:
     """
     验证并规范化输入参数。
 
@@ -139,8 +139,10 @@ def _validate_input(file_path: Path | str, format_type: Optional[str]) -> tuple[
             raise ValueError("format_type cannot be empty string")
     else:
         if not validated_path.suffix:
-            raise ValueError(f"Cannot determine format from file path: {validated_path}")
-        fmt = validated_path.suffix.lower().lstrip('.')
+            raise ValueError(
+                f"Cannot determine format from file path: {validated_path}"
+            )
+        fmt = validated_path.suffix.lower().lstrip(".")
 
     return validated_path, fmt
 
@@ -157,22 +159,22 @@ def _get_reader_mapping(lazy: bool) -> dict[str, Callable]:
     """
     if lazy:
         return {
-            'csv': pl.scan_csv,
-            'parquet': pl.scan_parquet,
-            'ipc': pl.scan_ipc,
-            'tsv': scan_tsv
+            "csv": pl.scan_csv,
+            "parquet": pl.scan_parquet,
+            "ipc": pl.scan_ipc,
+            "tsv": scan_tsv,
         }
 
     return {
-        'csv': pl.read_csv,
-        'tsv': read_tsv,
-        'xls': pl.read_excel,
-        'xlsx': pl.read_excel,
-        'ods': pl.read_ods,
-        'json': pl.read_json,
-        'parquet': pl.read_parquet,
-        'ipc': pl.read_ipc,
-        'avro': pl.read_avro,
+        "csv": pl.read_csv,
+        "tsv": read_tsv,
+        "xls": pl.read_excel,
+        "xlsx": pl.read_excel,
+        "ods": pl.read_ods,
+        "json": pl.read_json,
+        "parquet": pl.read_parquet,
+        "ipc": pl.read_ipc,
+        "avro": pl.read_avro,
     }
 
 
@@ -191,9 +193,7 @@ def _handle_focus_mode(fmt: str) -> Callable:
     """
     reader = getattr(pl, f"read_{fmt}", None)
     if reader is None:
-        raise ValueError(
-            f"Unsupported format '{fmt}' in focus mode. "
-        )
+        raise ValueError(f"Unsupported format '{fmt}' in focus mode. ")
     return reader
 
 
@@ -215,7 +215,7 @@ def getreader(
     format_type: Optional[str] = None,
     in_batch: bool = False,
     lazy: bool = False,
-    focus: bool = False
+    focus: bool = False,
 ) -> Callable:
     """
     根据文件扩展名或指定格式获取适当的读取器函数。
@@ -237,7 +237,7 @@ def getreader(
     Examples:
         >>> reader = getreader("data.csv")
         >>> df = reader("data.csv")
-        
+
         >>> reader = getreader("data.parquet", lazy=True)
         >>> lazy_df = reader("data.parquet")
     """
@@ -246,7 +246,7 @@ def getreader(
     if focus:
         return _handle_focus_mode(fmt)
 
-    if fmt == 'csv' and in_batch:
+    if fmt == "csv" and in_batch:
         return pl.read_csv_batched
 
     reader_mapping = _get_reader_mapping(lazy)
@@ -254,12 +254,12 @@ def getreader(
     if fmt in reader_mapping:
         return reader_mapping[fmt]
 
-    supported = ', '.join(sorted(reader_mapping.keys()))
+    supported = ", ".join(sorted(reader_mapping.keys()))
     warnings.warn(
         f"Unknown format '{fmt}', falling back to {'lazy' if lazy else 'eager'} CSV reader. "
         f"Supported formats: {supported}",
         UserWarning,
-        stacklevel=2
+        stacklevel=2,
     )
     return _get_fallback_reader(lazy)
 
@@ -276,7 +276,7 @@ def _is_archive_file(file_path: Path) -> bool:
     """
     if not file_path.is_file():
         return False
-    if file_path.suffix in ('.xlsx', '.xls', '.ods'):
+    if file_path.suffix in (".xlsx", ".xls", ".ods"):
         return False
     return is_zipfile(file_path) or is_tarfile(file_path)
 
@@ -296,11 +296,12 @@ def is_archive_file(file_path: Path) -> bool:
     )
 
 
-def read_archive(file_path: str | Path,
-                 filename: Optional[str] = None,
-                 format_type: Optional[str] = None,
-                 **kwargs
-                 ) -> pl.DataFrame:
+def read_archive(
+    file_path: str | Path,
+    filename: Optional[str] = None,
+    format_type: Optional[str] = None,
+    **kwargs,
+) -> pl.DataFrame:
     """
     读取压缩包中的数据文件。
 
@@ -331,7 +332,9 @@ def read_archive(file_path: str | Path,
     return _read_from_archive(archive_path, target_filename, reader, **kwargs)
 
 
-def _resolve_archive_and_filename(file_path: Path, filename: Optional[str]) -> tuple[Path, str]:
+def _resolve_archive_and_filename(
+    file_path: Path, filename: Optional[str]
+) -> tuple[Path, str]:
     """
     从文件路径解析压缩包路径和目标文件名。
 
@@ -375,19 +378,21 @@ def _get_archive_filename(archive_path: Path) -> str:
         str: 第一个数据文件的文件名
     """
     if is_zipfile(archive_path):
-        with ZipFile(archive_path, 'r') as zf:
+        with ZipFile(archive_path, "r") as zf:
             for name in zf.namelist():
-                if not name.endswith('/'):
+                if not name.endswith("/"):
                     return name
     elif is_tarfile(archive_path):
-        with TarFile(archive_path, 'r:*') as tf:
+        with TarFile(archive_path, "r:*") as tf:
             for member in tf.getmembers():
                 if member.isfile():
                     return member.name
     raise ValueError(f"Cannot determine filename from archive: {archive_path}")
 
 
-def _read_from_archive(archive_path: Path, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
+def _read_from_archive(
+    archive_path: Path, filename: str, reader: Callable, **kwargs
+) -> pl.DataFrame:
     """
     使用指定的读取器从压缩包中读取数据。
 
@@ -408,7 +413,9 @@ def _read_from_archive(archive_path: Path, filename: str, reader: Callable, **kw
         raise ValueError(f"Unsupported archive format: {archive_path}")
 
 
-def _read_from_zip(archive_path: Path, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
+def _read_from_zip(
+    archive_path: Path, filename: str, reader: Callable, **kwargs
+) -> pl.DataFrame:
     """
     从ZIP压缩包中读取数据。
 
@@ -421,7 +428,7 @@ def _read_from_zip(archive_path: Path, filename: str, reader: Callable, **kwargs
     Returns:
         pl.DataFrame: 加载的数据
     """
-    with ZipFile(archive_path, 'r') as zf:
+    with ZipFile(archive_path, "r") as zf:
         try:
             with zf.open(filename) as f:
                 return reader(f, **kwargs)
@@ -429,7 +436,9 @@ def _read_from_zip(archive_path: Path, filename: str, reader: Callable, **kwargs
             return _extract_and_read_zip(zf, filename, reader, **kwargs)
 
 
-def _read_from_tar(archive_path: Path, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
+def _read_from_tar(
+    archive_path: Path, filename: str, reader: Callable, **kwargs
+) -> pl.DataFrame:
     """
     从TAR压缩包中读取数据。
 
@@ -442,7 +451,7 @@ def _read_from_tar(archive_path: Path, filename: str, reader: Callable, **kwargs
     Returns:
         pl.DataFrame: 加载的数据
     """
-    with TarFile(archive_path, 'r:*') as tf:
+    with TarFile(archive_path, "r:*") as tf:
         try:
             with tf.extractfile(filename) as f:
                 return reader(f, **kwargs)
@@ -450,7 +459,9 @@ def _read_from_tar(archive_path: Path, filename: str, reader: Callable, **kwargs
             return _extract_and_read_tar(tf, filename, reader, **kwargs)
 
 
-def _extract_and_read_zip(zf: ZipFile, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
+def _extract_and_read_zip(
+    zf: ZipFile, filename: str, reader: Callable, **kwargs
+) -> pl.DataFrame:
     """
     从ZIP中提取文件并读取。
 
@@ -469,7 +480,9 @@ def _extract_and_read_zip(zf: ZipFile, filename: str, reader: Callable, **kwargs
         return reader(tmp_path, **kwargs)
 
 
-def _extract_and_read_tar(tf: TarFile, filename: str, reader: Callable, **kwargs) -> pl.DataFrame:
+def _extract_and_read_tar(
+    tf: TarFile, filename: str, reader: Callable, **kwargs
+) -> pl.DataFrame:
     """
     从TAR中提取文件并读取。
 
@@ -483,16 +496,17 @@ def _extract_and_read_tar(tf: TarFile, filename: str, reader: Callable, **kwargs
         pl.DataFrame: 加载的数据
     """
     import tarfile
+
     with TemporaryDirectory() as tmpdir:
         tmp_path = Path(tmpdir) / filename
 
-        if hasattr(tarfile, 'data_filter'):
-            tf.extract(filename, tmpdir, filter='data')
+        if hasattr(tarfile, "data_filter"):
+            tf.extract(filename, tmpdir, filter="data")
         else:
             warnings.warn(
                 "Extracting may be unsafe; consider updating Python",
                 UserWarning,
-                stacklevel=2
+                stacklevel=2,
             )
             tf.extract(filename, tmpdir)
 
@@ -506,7 +520,7 @@ def load_data(
     lazy: bool = False,
     focus: bool = False,
     transtype: pl.Expr | list[pl.Expr] | None = None,
-    **kwargs
+    **kwargs,
 ) -> pl.DataFrame | pl.LazyFrame | BatchedCsvReader:
     """
     统一的数据加载函数。
@@ -538,7 +552,7 @@ def load_data(
             format_type=format_type,
             in_batch=in_batch,
             lazy=lazy,
-            focus=focus
+            focus=focus,
         )
         df = reader(file_path, **kwargs)
 
@@ -550,9 +564,7 @@ def load_data(
     return df
 
 
-def excel_sheet_names(
-    file_path: Path | str
-) -> list[str]:
+def excel_sheet_names(file_path: Path | str) -> list[str]:
     """
     获取Excel文件中所有工作表的名称。
 
@@ -567,15 +579,13 @@ def excel_sheet_names(
         >>> print(names)
         ['Sheet1', 'Sheet2', 'Sheet3']
     """
-    with ZipFile(file_path, 'r') as zf:
-        xml_content = zf.read("xl/workbook.xml").decode('utf-8')
+    with ZipFile(file_path, "r") as zf:
+        xml_content = zf.read("xl/workbook.xml").decode("utf-8")
         sheet_names = re.findall(r'<sheet name="([^"]+)"', xml_content)
     return sheet_names
 
 
-def _get_excel_samecolumns_sheet(
-    file_path: Path | str
-) -> list[list[str]]:
+def _get_excel_samecolumns_sheet(file_path: Path | str) -> list[list[str]]:
     """
     获取具有相同列的Excel工作表分组。
 
@@ -591,8 +601,7 @@ def _get_excel_samecolumns_sheet(
     if len(sheet_names) == 1:
         return sheet_names
     sheet_cols = {
-        sn: pl.read_excel(file_path, sheet_name=sn).columns
-        for sn in sheet_names
+        sn: pl.read_excel(file_path, sheet_name=sn).columns for sn in sheet_names
     }
     grouped = {}
     for k, v in sheet_cols.items():
@@ -602,9 +611,7 @@ def _get_excel_samecolumns_sheet(
 
 
 def load_excel(
-    file_path: Path | str,
-    sheet_name: str = "Sheet1",
-    **kwargs
+    file_path: Path | str, sheet_name: str = "Sheet1", **kwargs
 ) -> pl.DataFrame:
     """
     加载Excel文件数据。
@@ -633,20 +640,18 @@ def load_excel(
     if sheet_name.lower() == "@all":
         if len(sheet_parts) != 1:
             raise ValueError("Excel file has multiple sheets with different columns")
-        df = pl.concat([
-            pl.read_excel(file_path, sheet_name=sn, **kwargs)
-            for sn in sheet_names
-        ])
+        df = pl.concat(
+            [pl.read_excel(file_path, sheet_name=sn, **kwargs) for sn in sheet_names]
+        )
         return df
     elif sheet_name.lower() == "@most":
         sheet_name = []
         for i in sheet_parts:
             if len(i) > len(sheet_name):
                 sheet_name = i
-        df = pl.concat([
-            pl.read_excel(file_path, sheet_name=sn, **kwargs)
-            for sn in sheet_name
-        ])
+        df = pl.concat(
+            [pl.read_excel(file_path, sheet_name=sn, **kwargs) for sn in sheet_name]
+        )
     elif sheet_name in sheet_names:
         df = pl.read_excel(file_path, sheet_name=sheet_name, **kwargs)
     else:
@@ -660,7 +665,7 @@ def read_csv_advanced(
     start_marker: Optional[str] = "#-------------------------",
     end_marker: Optional[str] = None,
     encoding: str = "utf-8",
-    **read_kwargs
+    **read_kwargs,
 ) -> pl.DataFrame:
     """
     从 ZIP 压缩包或文件夹中读取被标记行包裹的 CSV 数据。
@@ -689,13 +694,13 @@ def read_csv_advanced(
     Examples:
         >>> # 从 ZIP 文件读取（默认标记）
         >>> df = read_csv_from_zip("data.zip", encoding="gbk")
-        
+
         >>> # 从文件夹读取
         >>> df = read_csv_from_zip("./data_folder", separator="|")
-        
+
         >>> # 使用不同的起始和结束标记
         >>> df = read_csv_from_zip("data.zip", start_marker="=== BEGIN ===", end_marker="=== END ===")
-        
+
         >>> # 无标记，读取整个文件
         >>> df = read_csv_from_zip("data.zip", start_marker=None)
     """
@@ -713,11 +718,8 @@ def read_csv_advanced(
         raise ValueError("提取的数据区域为空，请检查标记是否正确")
 
     csv_content = "\n".join(data_lines)
-    
-    return pl.read_csv(
-        io.BytesIO(csv_content.encode("utf-8")),
-        **read_kwargs
-    )
+
+    return pl.read_csv(io.BytesIO(csv_content.encode("utf-8")), **read_kwargs)
 
 
 def _read_csv_content(path: Path, csv_name: Optional[str], encoding: str) -> str:
@@ -732,7 +734,7 @@ def _read_csv_content(path: Path, csv_name: Optional[str], encoding: str) -> str
     Returns:
         str: CSV 文件的文本内容
     """
-    if path.is_file() and path.suffix.lower() == '.zip':
+    if path.is_file() and path.suffix.lower() == ".zip":
         return _read_from_zip_file(path, csv_name, encoding)
     elif path.is_dir():
         return _read_from_directory(path, csv_name, encoding)
@@ -780,14 +782,14 @@ def _open_zip_with_encoding(zip_path: Path) -> ZipFile:
         return zf
     except (UnicodeDecodeError, LookupError):
         pass
-    
+
     try:
         zf = ZipFile(zip_path, "r", metadata_encoding="cp936")
         zf.namelist()
         return zf
     except (UnicodeDecodeError, LookupError):
         pass
-    
+
     return ZipFile(zip_path, "r")
 
 
@@ -826,7 +828,8 @@ def _resolve_csv_name_zip(zf, csv_name: Optional[str], zip_path: Path) -> str:
         return csv_name
 
     candidates = [
-        n for n in zf.namelist()
+        n
+        for n in zf.namelist()
         if n.lower().endswith(".csv") and not n.startswith("__MACOSX")
     ]
 
@@ -856,22 +859,21 @@ def _resolve_csv_name_dir(dir_path: Path, csv_name: Optional[str]) -> Path:
         return csv_file
 
     candidates = [
-        f for f in dir_path.iterdir()
-        if f.is_file() and f.suffix.lower() == ".csv"
+        f for f in dir_path.iterdir() if f.is_file() and f.suffix.lower() == ".csv"
     ]
 
     if len(candidates) == 0:
         raise ValueError(f"在 {dir_path} 中未找到 CSV 文件")
     if len(candidates) > 1:
-        raise ValueError(f"存在多个 CSV 文件，请指定 csv_name: {[f.name for f in candidates]}")
+        raise ValueError(
+            f"存在多个 CSV 文件，请指定 csv_name: {[f.name for f in candidates]}"
+        )
 
     return candidates[0]
 
 
 def _extract_data_lines(
-    content: str,
-    start_marker: Optional[str],
-    end_marker: Optional[str]
+    content: str, start_marker: Optional[str], end_marker: Optional[str]
 ) -> list[str]:
     """
     从内容中提取数据行。
@@ -890,7 +892,9 @@ def _extract_data_lines(
         return lines
 
     start_idx = _find_marker_index(lines, start_marker, find_first=True)
-    end_idx = _find_marker_index(lines, end_marker, find_first=False, start_from=start_idx)
+    end_idx = _find_marker_index(
+        lines, end_marker, find_first=False, start_from=start_idx
+    )
 
     if start_idx is None:
         warnings.warn(f"未找到起始标记 '{start_marker}'，将解析整个文件内容")
@@ -906,7 +910,7 @@ def _find_marker_index(
     lines: list[str],
     marker: Optional[str],
     find_first: bool = True,
-    start_from: Optional[int] = None
+    start_from: Optional[int] = None,
 ) -> Optional[int]:
     """
     查找标记行的索引。
@@ -923,10 +927,7 @@ def _find_marker_index(
     if marker is None:
         return None
 
-    search_range = range(
-        start_from + 1 if start_from is not None else 0,
-        len(lines)
-    )
+    search_range = range(start_from + 1 if start_from is not None else 0, len(lines))
 
     if find_first:
         for i in search_range:

@@ -24,14 +24,21 @@ import sys
 
 import pendulum as plm
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 __all__ = [
-    'take_from_list', 'Number', 'today', 'PathLike', 'FolderPaths', 'CheckResult',
-    'checkFolders', 'lastFile', 'yesterday'
+    "take_from_list",
+    "Number",
+    "today",
+    "PathLike",
+    "FolderPaths",
+    "CheckResult",
+    "checkFolders",
+    "lastFile",
+    "yesterday",
 ]
 
-Number = NewType('Number', int | float | complex)
+Number = NewType("Number", int | float | complex)
 
 PathLike = Union[str, Path]
 FolderPaths = Union[PathLike, list[PathLike]]
@@ -66,8 +73,14 @@ def take_from_list(target: T, source: List[T]) -> Optional[T]:
         return None
 
     if isinstance(target, str):
-        return next((item for item in source
-                    if isinstance(item, str) and (item in target or target in item)), None)
+        return next(
+            (
+                item
+                for item in source
+                if isinstance(item, str) and (item in target or target in item)
+            ),
+            None,
+        )
 
     if isinstance(target, Iterable):
         try:
@@ -79,10 +92,11 @@ def take_from_list(target: T, source: List[T]) -> Optional[T]:
     return next((item for item in source if item == target), None)
 
 
-def today(tz: Optional[str] = None,
-          fmt: Optional[str] = None,
-          addtime: bool = False,
-          return_std: bool = False
+def today(
+    tz: Optional[str] = None,
+    fmt: Optional[str] = None,
+    addtime: bool = False,
+    return_std: bool = False,
 ) -> Union[str, plm.DateTime, dt]:
     """
     获取当前日期或日期时间。
@@ -135,9 +149,14 @@ def today(tz: Optional[str] = None,
 
     if return_std:
         return dt(
-            res.year, res.month, res.day,
-            res.hour, res.minute, res.second, res.microsecond,
-            tzinfo=res.tzinfo
+            res.year,
+            res.month,
+            res.day,
+            res.hour,
+            res.minute,
+            res.second,
+            res.microsecond,
+            tzinfo=res.tzinfo,
         )
 
     return res
@@ -147,7 +166,7 @@ def yesterday(
     tz: Optional[str] = None,
     fmt: Optional[str] = None,
     addtime: bool = False,
-    return_std: bool = False
+    return_std: bool = False,
 ) -> Union[str, plm.DateTime, dt]:
     """
     获取昨日日期或一个自然日前的日期时间。
@@ -191,16 +210,22 @@ def yesterday(
 
     if return_std:
         return dt(
-            res.year, res.month, res.day,
-            res.hour, res.minute, res.second, res.microsecond,
-            tzinfo=res.tzinfo
+            res.year,
+            res.month,
+            res.day,
+            res.hour,
+            res.minute,
+            res.second,
+            res.microsecond,
+            tzinfo=res.tzinfo,
         )
 
     return res
 
 
-def checkFolders(folders: FolderPaths,
-                 mkdir: bool = True, output: bool = False) -> CheckResult:
+def checkFolders(
+    folders: FolderPaths, mkdir: bool = True, output: bool = False
+) -> CheckResult:
     """
     检查多个文件夹路径是否存在，可选择自动创建不存在的文件夹。
 
@@ -238,8 +263,9 @@ def checkFolders(folders: FolderPaths,
         return exists_flags[0] if len(exists_flags) == 1 else exists_flags
 
 
-def lastFile(folder: str | Path, filename: str,
-             last_: str = "mtime", mode: str = "desc") -> Path:
+def lastFile(
+    folder: str | Path, filename: str, last_: str = "mtime", mode: str = "desc"
+) -> Path:
     """
     获取指定文件夹下的最后一个文件。
 
@@ -281,7 +307,7 @@ def lastFile(folder: str | Path, filename: str,
         "createtime": "birthtime" if sys.version_info >= (3, 12) else "ctime",
         "mtime": "mtime",
         "atime": "atime",
-        "size": "size"
+        "size": "size",
     }
 
     if last_ not in attr_map:

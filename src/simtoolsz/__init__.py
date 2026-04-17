@@ -20,16 +20,23 @@ import simtoolsz.utils as utils
 import simtoolsz.datetime as datetime
 import simtoolsz.reader as reader
 import simtoolsz.countrycode as countrycode
+import simtoolsz.math as math
 
 
 try:
     __version__ = importlib.metadata.version("simtoolsz")
 except importlib.metadata.PackageNotFoundError:
-    __version__ = "0.2.14.2"
+    __version__ = "0.2.15"
 
 __author__ = "Sidney Zhang <zly@lyzhang.me>"
 
 __all__ = [
-    '__version__', 'mail', 'utils', 'datetime',
-    'db', 'reader', 'countrycode'
+    "__version__",
+    "mail",
+    "utils",
+    "datetime",
+    "db",
+    "reader",
+    "countrycode",
+    "math",
 ]

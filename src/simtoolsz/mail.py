@@ -40,9 +40,13 @@ from simtoolsz.utils import take_from_list
 
 
 __all__ = [
-    "send_email", "fetch_emails",
-    "quicksendemail", "quickemail", "load_email_by_subject",
-    "encode_utf7", "decode_utf7"
+    "send_email",
+    "fetch_emails",
+    "quicksendemail",
+    "quickemail",
+    "load_email_by_subject",
+    "encode_utf7",
+    "decode_utf7",
 ]
 
 
@@ -60,7 +64,7 @@ def send_email(
     signature: Optional[str] = None,
     inline_images: Optional[Dict[str, Union[Path, str]]] = None,
     smtp_config: Optional[Dict[str, Any]] = None,
-    timeout: int = 30
+    timeout: int = 30,
 ) -> Dict[str, Any]:
     """
     发送邮件，支持附件、HTML格式、内嵌图片等高级功能。
@@ -106,7 +110,7 @@ def send_email(
         ...     content="这是一封测试邮件",
         ...     recipients="friend@example.com"
         ... )
-        
+
         >>> # 高级用法 - 发送HTML邮件带附件
         >>> result = send_email(
         ...     email_account="your@gmail.com",
@@ -120,7 +124,7 @@ def send_email(
         ...     sender_name="张三",
         ...     signature="<br><em>此致<br>张三</em>"
         ... )
-        
+
         >>> # 使用内嵌图片
         >>> result = send_email(
         ...     email_account="your@163.com",
@@ -226,7 +230,9 @@ def send_email(
                 img_part = MIMEImage(img_data, _subtype=subtype)
                 img_part.add_header("Content-ID", f"<{cid}>")
                 encoded_filename = Header(img_path.name, "utf-8").encode()
-                img_part.add_header("Content-Disposition", "inline", filename=encoded_filename)
+                img_part.add_header(
+                    "Content-Disposition", "inline", filename=encoded_filename
+                )
                 msg.attach(img_part)
             except Exception as e:
                 raise RuntimeError(f"处理内嵌图片失败 {img_path}: {e}")
@@ -242,7 +248,9 @@ def send_email(
 
             encoded_filename = Header(file_path.name, "utf-8").encode()
             part = MIMEApplication(file_data, Name=encoded_filename)
-            part.add_header("Content-Disposition", "attachment", filename=encoded_filename)
+            part.add_header(
+                "Content-Disposition", "attachment", filename=encoded_filename
+            )
             msg.attach(part)
         except Exception as e:
             raise RuntimeError(f"处理附件失败 {file_path}: {e}")
@@ -253,9 +261,21 @@ def send_email(
         "qq.com": {"smtp_server": "smtp.qq.com", "port": 465, "use_ssl": True},
         "163.com": {"smtp_server": "smtp.163.com", "port": 465, "use_ssl": True},
         "126.com": {"smtp_server": "smtp.126.com", "port": 465, "use_ssl": True},
-        "outlook.com": {"smtp_server": "smtp-mail.outlook.com", "port": 587, "use_ssl": False},
-        "hotmail.com": {"smtp_server": "smtp-mail.outlook.com", "port": 587, "use_ssl": False},
-        "chinaott.net": {"smtp_server": "smtp.exmail.qq.com", "port": 465, "use_ssl": True},
+        "outlook.com": {
+            "smtp_server": "smtp-mail.outlook.com",
+            "port": 587,
+            "use_ssl": False,
+        },
+        "hotmail.com": {
+            "smtp_server": "smtp-mail.outlook.com",
+            "port": 587,
+            "use_ssl": False,
+        },
+        "chinaott.net": {
+            "smtp_server": "smtp.exmail.qq.com",
+            "port": 465,
+            "use_ssl": True,
+        },
     }
 
     if smtp_config:
@@ -285,7 +305,11 @@ def send_email(
                     emails.append(recipient_str)
         return emails
 
-    all_emails = extract_emails(all_recipients) + extract_emails(all_cc) + extract_emails(all_bcc)
+    all_emails = (
+        extract_emails(all_recipients)
+        + extract_emails(all_cc)
+        + extract_emails(all_bcc)
+    )
 
     try:
         if use_ssl:
@@ -294,7 +318,7 @@ def send_email(
             server = smtplib.SMTP(smtp_server, port, timeout=timeout)
             server.starttls()
 
-        server.local_hostname = 'Localhost'
+        server.local_hostname = "Localhost"
         server.login(email_account, password)
         server.sendmail(email_account, all_emails, msg.as_string())
         server.quit()
@@ -303,7 +327,7 @@ def send_email(
             "success": True,
             "message": f"邮件发送成功，共发送给{len(all_emails)}个收件人",
             "recipient_count": len(all_emails),
-            "smtp_server": smtp_server
+            "smtp_server": smtp_server,
         }
 
     except Exception as e:
@@ -311,11 +335,11 @@ def send_email(
             "success": False,
             "message": f"邮件发送失败: {str(e)}",
             "recipient_count": 0,
-            "smtp_server": smtp_server
+            "smtp_server": smtp_server,
         }
 
 
-def encode_utf7(text: str, type: Literal['imap', 'normal'] = 'imap') -> str:
+def encode_utf7(text: str, type: Literal["imap", "normal"] = "imap") -> str:
     """
     将文本编码为UTF-7格式，主要用于IMAP协议中的邮箱名称编码。
 
@@ -336,17 +360,17 @@ def encode_utf7(text: str, type: Literal['imap', 'normal'] = 'imap') -> str:
         >>> # 编码中文邮箱名称
         >>> folder_name = "收件箱"
         >>> encoded = encode_utf7(folder_name)
-        
+
         >>> # 使用标准UTF-7编码
         >>> standard_encoded = encode_utf7(folder_name, type='normal')
     """
     res = text.encode("utf-7").decode("utf-8")
-    if type == 'imap':
+    if type == "imap":
         res = res.replace("+", "&")
     return res
 
 
-def decode_utf7(text: str, type: Literal['imap', 'normal'] = 'imap') -> str:
+def decode_utf7(text: str, type: Literal["imap", "normal"] = "imap") -> str:
     """
     将UTF-7编码的文本解码为Unicode格式，主要用于IMAP协议中的邮箱名称解码。
 
@@ -368,7 +392,7 @@ def decode_utf7(text: str, type: Literal['imap', 'normal'] = 'imap') -> str:
         >>> decoded = decode_utf7(encoded_folder)
         '收件箱'
     """
-    if type == 'imap':
+    if type == "imap":
         res = text.replace("&", "+")
     else:
         res = text
@@ -381,12 +405,12 @@ def fetch_emails(
     subject: Optional[str] = None,
     sender: Optional[str] = None,
     date_range: Optional[Tuple[datetime, datetime]] = None,
-    mailbox: str = 'INBOX',
+    mailbox: str = "INBOX",
     download_attachments: bool = False,
-    attachment_dir: str = 'attachments',
+    attachment_dir: str = "attachments",
     max_emails: Optional[int] = None,
     imap_config: Optional[Dict[str, Any]] = None,
-    search_mode: Literal['exact', 'fuzzy', 'regex'] = 'exact'
+    search_mode: Literal["exact", "fuzzy", "regex"] = "exact",
 ) -> Dict[str, Any]:
     """
     获取邮件，支持按主题、发件人搜索，附件下载等功能。
@@ -433,7 +457,7 @@ def fetch_emails(
         ...     password="your_password",
         ...     max_emails=10
         ... )
-        
+
         >>> # 按主题搜索邮件
         >>> result = fetch_emails(
         ...     email_account="your@gmail.com",
@@ -442,7 +466,7 @@ def fetch_emails(
         ...     search_mode="fuzzy",
         ...     date_range=(datetime(2024, 1, 1), datetime(2024, 12, 31))
         ... )
-        
+
         >>> # 下载附件
         >>> result = fetch_emails(
         ...     email_account="your@163.com",
@@ -467,10 +491,22 @@ def fetch_emails(
             "gmail.com": {"server": "imap.gmail.com", "port": 993, "use_ssl": True},
             "163.com": {"server": "imap.163.com", "port": 993, "use_ssl": True},
             "126.com": {"server": "imap.126.com", "port": 993, "use_ssl": True},
-            "outlook.com": {"server": "imap-mail.outlook.com", "port": 993, "use_ssl": True},
-            "hotmail.com": {"server": "imap-mail.outlook.com", "port": 993, "use_ssl": True},
+            "outlook.com": {
+                "server": "imap-mail.outlook.com",
+                "port": 993,
+                "use_ssl": True,
+            },
+            "hotmail.com": {
+                "server": "imap-mail.outlook.com",
+                "port": 993,
+                "use_ssl": True,
+            },
             "aliyun.com": {"server": "imap.aliyun.com", "port": 993, "use_ssl": True},
-            "chinaott.net": {"server": "imap.exmail.qq.com", "port": 993, "use_ssl": True},
+            "chinaott.net": {
+                "server": "imap.exmail.qq.com",
+                "port": 993,
+                "use_ssl": True,
+            },
         }
 
         if imap_config:
@@ -479,7 +515,9 @@ def fetch_emails(
             use_ssl = imap_config.get("use_ssl", True)
         else:
             if domain not in default_imap_config:
-                raise ValueError(f"不支持的邮箱服务商: {domain}，请提供自定义imap_config")
+                raise ValueError(
+                    f"不支持的邮箱服务商: {domain}，请提供自定义imap_config"
+                )
             config = default_imap_config[domain]
             imap_server = config["server"]
             port = config["port"]
@@ -501,7 +539,7 @@ def fetch_emails(
                     "message": f"邮箱文件夹 {mailbox} 不存在",
                     "email_count": 0,
                     "emails": [],
-                    "attachments_dir": attachment_dir if download_attachments else None
+                    "attachments_dir": attachment_dir if download_attachments else None,
                 }
             else:
                 mailbox = selected_mailbox.split('"')[-2]
@@ -509,7 +547,7 @@ def fetch_emails(
             try:
                 mail.select(mailbox)
             except:
-                mail.select('INBOX')
+                mail.select("INBOX")
 
             search_criteria = []
 
@@ -526,18 +564,18 @@ def fetch_emails(
                 search_criteria.append(f'(FROM "{sender}")')
 
             if len(search_criteria) > 1:
-                search_query = ' '.join(search_criteria)
+                search_query = " ".join(search_criteria)
             else:
-                search_query = search_criteria[0] if search_criteria else 'ALL'
+                search_query = search_criteria[0] if search_criteria else "ALL"
 
             status, messages = mail.search(None, search_query)
-            if status != 'OK' or not messages[0]:
+            if status != "OK" or not messages[0]:
                 return {
                     "success": True,
                     "message": "没有找到匹配的邮件",
                     "email_count": 0,
                     "emails": [],
-                    "attachments_dir": attachment_dir if download_attachments else None
+                    "attachments_dir": attachment_dir if download_attachments else None,
                 }
 
             mail_ids = messages[0].split()
@@ -547,31 +585,34 @@ def fetch_emails(
             emails = []
             for mail_id in reversed(mail_ids):
                 try:
-                    status, data = mail.fetch(mail_id, '(RFC822)')
-                    if status != 'OK':
+                    status, data = mail.fetch(mail_id, "(RFC822)")
+                    if status != "OK":
                         continue
 
                     msg = email.message_from_bytes(data[0][1])
 
-                    subject_header = decode_header(msg.get('Subject', ''))
+                    subject_header = decode_header(msg.get("Subject", ""))
                     subject_str = ""
                     for part, encoding in subject_header:
                         if isinstance(part, bytes):
                             try:
-                                subject_str += part.decode(encoding or 'utf-8', errors='replace')
+                                subject_str += part.decode(
+                                    encoding or "utf-8", errors="replace"
+                                )
                             except:
-                                subject_str += part.decode('gbk', errors='replace')
+                                subject_str += part.decode("gbk", errors="replace")
                         else:
                             subject_str += str(part)
 
-                    if subject and search_mode == 'regex':
+                    if subject and search_mode == "regex":
                         import re
+
                         if not re.search(subject, subject_str, re.IGNORECASE):
                             continue
-                    elif subject and search_mode == 'fuzzy':
+                    elif subject and search_mode == "fuzzy":
                         if subject.lower() not in subject_str.lower():
                             continue
-                    elif subject and search_mode == 'exact':
+                    elif subject and search_mode == "exact":
                         if subject != subject_str:
                             continue
 
@@ -585,21 +626,27 @@ def fetch_emails(
                             content_type = part.get_content_type()
                             content_disposition = str(part.get("Content-Disposition"))
 
-                            if part.get('Content-Length'):
+                            if part.get("Content-Length"):
                                 try:
-                                    total_size += int(part.get('Content-Length'))
+                                    total_size += int(part.get("Content-Length"))
                                 except:
                                     pass
 
                             if "attachment" not in content_disposition:
                                 try:
                                     if content_type == "text/plain":
-                                        text_body += part.get_payload(decode=True).decode(
-                                            part.get_content_charset() or 'utf-8', errors='replace'
+                                        text_body += part.get_payload(
+                                            decode=True
+                                        ).decode(
+                                            part.get_content_charset() or "utf-8",
+                                            errors="replace",
                                         )
                                     elif content_type == "text/html":
-                                        html_body += part.get_payload(decode=True).decode(
-                                            part.get_content_charset() or 'utf-8', errors='replace'
+                                        html_body += part.get_payload(
+                                            decode=True
+                                        ).decode(
+                                            part.get_content_charset() or "utf-8",
+                                            errors="replace",
                                         )
                                 except:
                                     pass
@@ -608,38 +655,44 @@ def fetch_emails(
                                 try:
                                     filename = decode_header(part.get_filename())[0][0]
                                     if isinstance(filename, bytes):
-                                        filename = filename.decode('utf-8', errors='replace')
+                                        filename = filename.decode(
+                                            "utf-8", errors="replace"
+                                        )
 
                                     filepath = os.path.join(attachment_dir, filename)
-                                    with open(filepath, 'wb') as f:
+                                    with open(filepath, "wb") as f:
                                         f.write(part.get_payload(decode=True))
 
-                                    attachments_list.append({
-                                        'filename': filename,
-                                        'filepath': os.path.abspath(filepath),
-                                        'size': len(part.get_payload(decode=True))
-                                    })
+                                    attachments_list.append(
+                                        {
+                                            "filename": filename,
+                                            "filepath": os.path.abspath(filepath),
+                                            "size": len(part.get_payload(decode=True)),
+                                        }
+                                    )
                                 except Exception as e:
                                     print(f"处理附件失败: {e}")
                     else:
                         try:
                             text_body = msg.get_payload(decode=True).decode(
-                                msg.get_content_charset() or 'utf-8', errors='replace'
+                                msg.get_content_charset() or "utf-8", errors="replace"
                             )
                             total_size = len(msg.get_payload(decode=True))
                         except:
                             pass
 
-                    emails.append({
-                        'subject': subject_str,
-                        'from': msg.get('From', ''),
-                        'to': msg.get('To', ''),
-                        'date': msg.get('Date', ''),
-                        'text_body': text_body.strip(),
-                        'html_body': html_body.strip(),
-                        'attachments': attachments_list,
-                        'size': total_size
-                    })
+                    emails.append(
+                        {
+                            "subject": subject_str,
+                            "from": msg.get("From", ""),
+                            "to": msg.get("To", ""),
+                            "date": msg.get("Date", ""),
+                            "text_body": text_body.strip(),
+                            "html_body": html_body.strip(),
+                            "attachments": attachments_list,
+                            "size": total_size,
+                        }
+                    )
 
                 except Exception as e:
                     print(f"处理邮件 {mail_id} 失败: {e}")
@@ -653,7 +706,7 @@ def fetch_emails(
                 "message": f"成功获取 {len(emails)} 封邮件",
                 "email_count": len(emails),
                 "emails": emails,
-                "attachments_dir": attachment_dir if download_attachments else None
+                "attachments_dir": attachment_dir if download_attachments else None,
             }
 
         except Exception as e:
@@ -663,7 +716,7 @@ def fetch_emails(
                 "message": f"邮件获取失败: {str(e)}",
                 "email_count": 0,
                 "emails": [],
-                "attachments_dir": None
+                "attachments_dir": None,
             }
 
     except Exception as e:
@@ -672,7 +725,7 @@ def fetch_emails(
             "message": f"连接失败: {str(e)}",
             "email_count": 0,
             "emails": [],
-            "attachments_dir": None
+            "attachments_dir": None,
         }
 
 

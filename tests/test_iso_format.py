@@ -2,13 +2,15 @@
 """
 测试ISO 8601格式转换功能
 """
+
 import pendulum as plm
 from src.simtoolsz.datetime import ConversionType, DurationFormat
+
 
 def test_iso_format():
     """测试各种ISO 8601格式转换"""
     converter = ConversionType(DurationFormat.SECONDS)
-    
+
     # 测试用例
     test_cases = [
         # (总秒数, 期望的ISO格式)
@@ -29,17 +31,18 @@ def test_iso_format():
         (0.5, "PT0.5S"),
         (3600.5, "PT1H0.5S"),
     ]
-    
+
     print("测试ISO 8601格式转换:")
     print("-" * 50)
-    
+
     for total_seconds, expected in test_cases:
         duration = plm.duration(seconds=total_seconds)
         result = converter._duration_to_iso(duration)
         status = "✓" if result == expected else "✗"
         print(f"{status} {total_seconds:>8}s -> {result:<20} (期望: {expected})")
-    
+
     print("-" * 50)
+
 
 if __name__ == "__main__":
     test_iso_format()
